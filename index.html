@@ -36,27 +36,27 @@
 
     /* Glass UI effect */
     .glass-card {
-      background: rgba(14, 18, 27, 0.82);
+      background: rgba(14, 18, 27, 0.85);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
     }
     
     .glass-btn {
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.16);
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
     }
     
     .glass-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3);
+      background: rgba(255, 255, 255, 0.22);
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(249, 115, 22, 0.35);
     }
 
     .glass-btn:active {
-      transform: translateY(1px) scale(0.98);
+      transform: scale(0.95);
     }
 
     /* Dramatic Speed Lines during heavy throw */
@@ -133,7 +133,7 @@
       text-shadow: 0 0 24px rgba(249, 115, 22, 0.85), 0 4px 14px rgba(0, 0, 0, 0.95);
     }
 
-    /* Horizontal scrollbar hidden for compact mobile toolbar */
+    /* Horizontal & Vertical scrollbar hidden */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -145,8 +145,8 @@
     /* Shotgun Mode active glow */
     .shotgun-active {
       background: linear-gradient(135deg, #a855f7, #ec4899) !important;
-      box-shadow: 0 0 20px rgba(236, 72, 153, 0.6) !important;
-      border-color: rgba(255, 255, 255, 0.6) !important;
+      box-shadow: 0 0 18px rgba(236, 72, 153, 0.7) !important;
+      border-color: rgba(255, 255, 255, 0.8) !important;
     }
   </style>
 </head>
@@ -165,46 +165,112 @@
     <circle id="aim-target" cx="0" cy="0" r="14" fill="rgba(249, 115, 22, 0.3)" stroke="#fb923c" stroke-width="2.5" />
   </svg>
 
-  <!-- Top Bar: Metrics & Branding -->
-  <div class="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-20">
-    <div class="glass-card rounded-2xl px-5 py-3 pointer-events-auto flex items-center space-x-3.5">
-      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 via-orange-600 to-rose-600 flex items-center justify-center text-white text-2xl shadow-lg shadow-orange-600/40">
+  <!-- 🎯 極小ミニマルヘッダー（左上＆右上）：中央は完全に素通し -->
+  <div class="absolute top-2 left-2 pointer-events-none z-20 flex items-center space-x-2">
+    <div class="glass-card rounded-xl px-2.5 py-1 flex items-center space-x-1.5 pointer-events-auto">
+      <div class="w-5 h-5 rounded-md bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center text-white text-xs">
         <i class="fa-solid fa-burst"></i>
       </div>
-      <div>
-        <div class="flex items-center space-x-2">
-          <h1 class="text-base font-black tracking-wider text-white">POTTERY SMASH 3D</h1>
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-orange-500 to-rose-500 text-white uppercase">Ultra</span>
-        </div>
-        <p class="text-xs text-amber-300/90 font-medium">壁を直接タップで照準発射！連打・スワイプ対応</p>
-      </div>
+      <span class="text-[11px] font-black tracking-wide text-white">POTTERY SMASH</span>
+      <span class="px-1 py-0.2 rounded text-[9px] font-black bg-rose-500 text-white">3D</span>
+    </div>
+  </div>
+
+  <!-- 右上：ミニテレメトリーステータス（撃破数・球速） -->
+  <div class="absolute top-2 right-2 pointer-events-none z-20 flex items-center space-x-1.5">
+    <div class="glass-card rounded-xl px-2 py-1 pointer-events-auto flex items-center space-x-1.5 text-[11px]">
+      <span class="text-slate-400 font-bold">撃破:</span>
+      <span id="stat-smashes" class="font-black text-amber-400">0</span>
+    </div>
+    <div class="glass-card rounded-xl px-2 py-1 pointer-events-auto flex items-center space-x-1 text-[11px]">
+      <span class="text-slate-400 font-bold">球速:</span>
+      <span id="stat-speed" class="font-black text-cyan-400">0 <span class="text-[9px]">km/h</span></span>
+    </div>
+  </div>
+
+  <!-- 👈 左側縦型ドック：植木鉢パレット（上下中央配置・左手親指で操作） -->
+  <div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-20 flex flex-col items-center">
+    <div class="glass-card rounded-2xl p-1.5 flex flex-col gap-1.5 pointer-events-auto max-h-[82vh] overflow-y-auto no-scrollbar shadow-2xl" onpointerdown="event.stopPropagation()">
+      <div class="text-[9px] font-black text-slate-400 text-center tracking-widest uppercase mb-0.5">鉢素材</div>
+      
+      <button id="type-terracotta" onclick="setPotType('terracotta')" class="pot-type-btn active w-12 h-11 rounded-xl text-xs font-bold flex flex-col items-center justify-center bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md transition" title="素焼き鉢">
+        <i class="fa-solid fa-seedling text-sm"></i>
+        <span class="text-[9px] mt-0.5 font-bold">素焼き</span>
+      </button>
+
+      <button id="type-glazed" onclick="setPotType('glazed')" class="pot-type-btn w-12 h-11 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition" title="瑠璃青磁鉢">
+        <i class="fa-solid fa-gem text-sm text-cyan-400"></i>
+        <span class="text-[9px] mt-0.5">青磁</span>
+      </button>
+
+      <button id="type-porcelain" onclick="setPotType('porcelain')" class="pot-type-btn w-12 h-11 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition" title="白磁鉢">
+        <i class="fa-solid fa-leaf text-sm text-emerald-400"></i>
+        <span class="text-[9px] mt-0.5">白磁</span>
+      </button>
+
+      <button id="type-concrete" onclick="setPotType('concrete')" class="pot-type-btn w-12 h-11 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition" title="モルタル鉢">
+        <i class="fa-solid fa-cube text-sm text-slate-400"></i>
+        <span class="text-[9px] mt-0.5">石材</span>
+      </button>
+
+      <div class="w-8 h-[1px] bg-white/20 my-0.5 self-center"></div>
+
+      <!-- 💥 特殊ポット（爆弾・水晶・溶岩） -->
+      <button id="type-dynamite" onclick="setPotType('dynamite')" class="pot-type-btn w-12 h-11 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-rose-300 hover:text-white hover:bg-rose-600/30 border border-rose-500/30 transition" title="💣 ダイナマイト鉢 (大爆発)">
+        <i class="fa-solid fa-bomb text-sm text-rose-400"></i>
+        <span class="text-[9px] mt-0.5 font-bold">爆弾</span>
+      </button>
+
+      <button id="type-crystal" onclick="setPotType('crystal')" class="pot-type-btn w-12 h-11 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-cyan-300 hover:text-white hover:bg-cyan-600/30 border border-cyan-500/30 transition" title="💎 クリスタル鉢 (140破片)">
+        <i class="fa-solid fa-wand-magic-sparkles text-sm text-cyan-300"></i>
+        <span class="text-[9px] mt-0.5 font-bold">水晶</span>
+      </button>
+
+      <button id="type-magma" onclick="setPotType('magma')" class="pot-type-btn w-12 h-11 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-amber-300 hover:text-white hover:bg-amber-600/30 border border-amber-500/30 transition" title="🌋 溶岩鉢 (超重量激震)">
+        <i class="fa-solid fa-volcano text-sm text-amber-400"></i>
+        <span class="text-[9px] mt-0.5 font-bold">溶岩</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 👉 右側縦型ドック：ユーティリティ ＆ アクション（右手親指で操作） -->
+  <div class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-20 flex flex-col items-end gap-2.5">
+    
+    <!-- 上段：ユーティリティ縦バー（タワー再建・カメラ・スロー・清掃など） -->
+    <div class="glass-card rounded-2xl p-1.5 flex flex-col gap-1.5 pointer-events-auto shadow-xl" onpointerdown="event.stopPropagation()">
+      <button onclick="resetTower()" class="glass-btn w-11 h-10 rounded-xl flex items-center justify-center text-amber-300 hover:bg-amber-500/20" title="ピラミッドタワーを再構築">
+        <i class="fa-solid fa-cubes-stacked text-sm"></i>
+      </button>
+      <button id="cam-toggle-btn" onclick="cycleCameraView()" class="glass-btn w-11 h-10 rounded-xl flex items-center justify-center text-slate-200" title="カメラ視点切替">
+        <i class="fa-solid fa-video text-sm text-amber-400"></i>
+      </button>
+      <button id="slowmo-btn" onclick="toggleSlowMo()" class="glass-btn w-11 h-10 rounded-xl flex items-center justify-center text-slate-200" title="スローモーション">
+        <i class="fa-solid fa-gauge-high text-sm text-cyan-400"></i>
+      </button>
+      <button onclick="respawnReadyPot()" class="glass-btn w-11 h-10 rounded-xl flex items-center justify-center text-slate-200 hover:text-amber-400" title="新しい鉢を構える">
+        <i class="fa-solid fa-rotate-left text-sm"></i>
+      </button>
+      <button onclick="clearRoom()" class="glass-btn w-11 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-400" title="破片と壁の傷を清掃">
+        <i class="fa-solid fa-broom text-sm"></i>
+      </button>
+      <button id="sound-btn" onclick="toggleAudio()" class="glass-btn w-11 h-10 rounded-xl flex items-center justify-center text-amber-400" title="サウンド切り替え">
+        <i class="fa-solid fa-volume-high text-sm"></i>
+      </button>
     </div>
 
-    <!-- Ammo / Auto-Reload Indicator -->
-    <div class="hidden sm:flex items-center glass-card rounded-2xl px-3.5 py-2 space-x-2 pointer-events-auto">
-      <div id="reload-indicator" class="w-3 h-3 rounded-full bg-emerald-400 shadow-md shadow-emerald-400/80 animate-pulse"></div>
-      <span id="reload-text" class="text-xs font-bold text-emerald-300">READY (発射可能)</span>
+    <!-- 下段：アクション投擲（3連射 ＆ 全力投球）右手親指のベストポジション -->
+    <div class="flex flex-col gap-2 pointer-events-auto" onpointerdown="event.stopPropagation()">
+      <button id="shotgun-toggle-btn" onclick="toggleShotgunMode()" class="glass-btn w-14 h-12 rounded-2xl flex flex-col items-center justify-center text-slate-200 border border-purple-400/40 hover:text-white shadow-lg" title="3連ショットガン射出">
+        <i class="fa-solid fa-burst text-purple-400 text-sm"></i>
+        <span id="shotgun-label" class="text-[9px] font-black mt-0.5">3連:OFF</span>
+      </button>
+
+      <button onclick="forceThrow(1.5)" class="w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-white bg-gradient-to-tr from-orange-600 via-rose-600 to-amber-500 shadow-xl shadow-orange-600/50 border border-white/20 active:scale-95 transition" title="全力投球">
+        <i class="fa-solid fa-meteor text-amber-200 text-base"></i>
+        <span class="text-[9px] font-black tracking-tighter mt-0.5">全力投球</span>
+      </button>
     </div>
 
-    <!-- Live Telemetry Display -->
-    <div class="hidden md:flex items-center space-x-2.5 pointer-events-auto">
-      <div class="glass-card rounded-2xl px-4 py-2.5 text-center min-w-[95px]">
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">撃破数</div>
-        <div id="stat-smashes" class="text-2xl font-black text-amber-400">0</div>
-      </div>
-      <div class="glass-card rounded-2xl px-4 py-2.5 text-center min-w-[95px]">
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">飛び散った破片</div>
-        <div id="stat-shards" class="text-2xl font-black text-emerald-400">0</div>
-      </div>
-      <div class="glass-card rounded-2xl px-4 py-2.5 text-center min-w-[120px]">
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">最高球速</div>
-        <div id="stat-speed" class="text-2xl font-black text-cyan-400">0 <span class="text-xs font-semibold text-cyan-200">km/h</span></div>
-      </div>
-      <div class="glass-card rounded-2xl px-4 py-2.5 text-center min-w-[110px]">
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">直撃破壊力</div>
-        <div id="stat-force" class="text-2xl font-black text-rose-400">0 <span class="text-xs font-semibold text-rose-200">kN</span></div>
-      </div>
-    </div>
   </div>
 
   <!-- Throw Guidance / Dynamic Power Reticle -->
@@ -219,104 +285,26 @@
   </div>
 
   <!-- First Time User Tutorial / Hint -->
-  <div id="guide-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass-card rounded-3xl p-6 text-center max-w-sm pointer-events-none z-20 transition-all duration-500 shadow-2xl">
-    <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-3xl mb-3.5 shadow-lg shadow-orange-500/40 animate-pulse">
+  <div id="guide-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass-card rounded-3xl p-5 text-center max-w-xs pointer-events-none z-20 transition-all duration-500 shadow-2xl">
+    <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-2xl mb-2.5 shadow-lg shadow-orange-500/40 animate-pulse">
       <i class="fa-solid fa-bullseye"></i>
     </div>
-    <h2 class="text-lg font-black text-white mb-1">壁をタップして直撃破壊！</h2>
-    <p class="text-xs text-slate-300 leading-relaxed mb-4">
-      壁の壊したい場所を<strong class="text-amber-300">ポンと直接タップ</strong>すると、手元から鉢が一直線に飛んでいって大激突！<br>
-      <span class="text-orange-400 font-bold">連打タップで連続投擲</span>や、長押しスワイプで引っ張り投球も可能です。
+    <h2 class="text-base font-black text-white mb-1">壁やタワーを直接タップ！</h2>
+    <p class="text-[11px] text-slate-300 leading-relaxed mb-3">
+      壊したい場所を<strong class="text-amber-300">ポンと直接タップ</strong>すると、手元から一直線に飛んで激突粉砕！<br>
+      左右のボタンで鉢の変更や全力投球が可能です。
     </p>
-    <div class="inline-block px-3 py-1 rounded-full bg-white/10 text-[11px] text-amber-200 font-semibold border border-white/10">
-      ⚡ スペースキーで即座に連続全力投球可能
-    </div>
-  </div>
-
-  <!-- Bottom Control Dock -->
-  <div class="absolute bottom-5 left-4 right-4 flex flex-col md:flex-row items-center justify-between gap-3 pointer-events-none z-20">
-    <!-- Left: Pottery Type Selection (Standard & Special Pots) -->
-    <div class="glass-card rounded-2xl p-1.5 flex items-center space-x-1 pointer-events-auto overflow-x-auto no-scrollbar max-w-full">
-      <button id="type-terracotta" onclick="setPotType('terracotta')" class="pot-type-btn active px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md shrink-0">
-        <i class="fa-solid fa-seedling"></i>
-        <span>素焼き</span>
-      </button>
-      <button id="type-glazed" onclick="setPotType('glazed')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition shrink-0">
-        <i class="fa-solid fa-gem"></i>
-        <span>瑠璃青磁</span>
-      </button>
-      <button id="type-porcelain" onclick="setPotType('porcelain')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition shrink-0">
-        <i class="fa-solid fa-leaf"></i>
-        <span>白磁</span>
-      </button>
-      <button id="type-concrete" onclick="setPotType('concrete')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition shrink-0">
-        <i class="fa-solid fa-cube"></i>
-        <span>モルタル</span>
-      </button>
-
-      <!-- 💥 特殊ポット：ダイナマイト・クリスタル・メガマグマ -->
-      <div class="h-5 w-[1px] bg-white/20 mx-1 shrink-0"></div>
-
-      <button id="type-dynamite" onclick="setPotType('dynamite')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-rose-300 hover:text-white hover:bg-rose-600/30 border border-rose-500/30 transition shrink-0" title="爆風でブロックタワーを一網打尽">
-        <i class="fa-solid fa-bomb text-rose-400"></i>
-        <span>💣 爆弾</span>
-      </button>
-      <button id="type-crystal" onclick="setPotType('crystal')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-cyan-300 hover:text-white hover:bg-cyan-600/30 border border-cyan-500/30 transition shrink-0" title="140個以上の光の破片と極上ガラス破砕音">
-        <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
-        <span>💎 水晶</span>
-      </button>
-      <button id="type-magma" onclick="setPotType('magma')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-amber-300 hover:text-white hover:bg-amber-600/30 border border-amber-500/30 transition shrink-0" title="超重量！地響きとともに壁を破砕">
-        <i class="fa-solid fa-volcano text-amber-400"></i>
-        <span>🌋 溶岩</span>
-      </button>
-    </div>
-
-    <!-- Center: Fast Throw Trigger & Shotgun Toggle -->
-    <div class="pointer-events-auto flex items-center space-x-2">
-      <button id="shotgun-toggle-btn" onclick="toggleShotgunMode()" class="glass-btn px-4 py-3 rounded-2xl text-xs font-black text-slate-200 border border-purple-400/30 flex items-center space-x-1.5 hover:text-white" title="1タップで3個同時に扇状射出">
-        <i class="fa-solid fa-burst text-purple-400"></i>
-        <span id="shotgun-label">3連射: OFF</span>
-      </button>
-
-      <button onclick="forceThrow(1.5)" class="glass-btn px-5 py-3 rounded-2xl text-xs font-black text-white bg-gradient-to-r from-orange-500 to-rose-600 shadow-lg shadow-orange-600/40 flex items-center space-x-2">
-        <i class="fa-solid fa-meteor text-amber-200 text-sm"></i>
-        <span>全力投球 (MAX)</span>
-      </button>
-    </div>
-
-    <!-- Right: Utilities & Camera Modes -->
-    <div class="glass-card rounded-2xl p-1.5 flex items-center space-x-1.5 pointer-events-auto">
-      <button onclick="resetTower()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-amber-300 flex items-center space-x-1.5 hover:bg-amber-500/20" title="ピラミッドタワーを再構築">
-        <i class="fa-solid fa-cubes-stacked text-amber-400"></i>
-        <span>タワー再建</span>
-      </button>
-      <button id="cam-toggle-btn" onclick="cycleCameraView()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-200 flex items-center space-x-1.5" title="カメラ視点切替">
-        <i class="fa-solid fa-video text-amber-400"></i>
-        <span id="cam-label">視点: 投擲手</span>
-      </button>
-      <button id="slowmo-btn" onclick="toggleSlowMo()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-200 flex items-center space-x-1.5" title="スローモーション">
-        <i class="fa-solid fa-gauge-high text-cyan-400"></i>
-        <span id="slowmo-label">通常速</span>
-      </button>
-      <button onclick="respawnReadyPot()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-amber-400" title="新しい鉢を構える">
-        <i class="fa-solid fa-rotate-left"></i>
-      </button>
-      <button onclick="clearRoom()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-rose-400" title="破片と壁の傷を清掃">
-        <i class="fa-solid fa-broom"></i>
-      </button>
-      <button id="sound-btn" onclick="toggleAudio()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-amber-400" title="サウンド切り替え">
-        <i class="fa-solid fa-volume-high"></i>
-      </button>
+    <div class="inline-block px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] text-amber-200 font-semibold border border-white/10">
+      画面タップで即プレイ開始
     </div>
   </div>
 
   <!-- Toast notification -->
-  <div id="toast-notify" class="absolute bottom-24 left-1/2 -translate-x-1/2 glass-card px-4 py-2 rounded-xl text-xs text-amber-300 opacity-0 transition-opacity duration-300 pointer-events-none z-30 font-semibold shadow-xl">
+  <div id="toast-notify" class="absolute bottom-6 left-1/2 -translate-x-1/2 glass-card px-4 py-1.5 rounded-xl text-xs text-amber-300 opacity-0 transition-opacity duration-300 pointer-events-none z-30 font-semibold shadow-xl">
     新しい植木鉢を構えました！
   </div>
 
   <script>
-    /* Global Simulation State */
     let scene, camera, renderer;
     let readyPot = null;              // Currently held/readied pot at the pedestal/hand
     let flyingPots = [];              // Multi-projectile array: allows continuous machine-gun throws!
@@ -329,14 +317,14 @@
     let wallImpactDecals = [];
     let speedLinesActive = false;
 
-    // 💥 特殊ポット & 3連乱射ステート
-    let isShotgunMode = false;        // When true, fires 3 pots in a wide spread!
+    // 特殊ポット & 3連乱射ステート
+    let isShotgunMode = false;
 
-    // 💥 1. IMPACT POLISH: Hit-stop & Shockwaves
-    let hitStopTimer = 0;             // When > 0, freezes physics briefly for bone-crushing punch
+    // IMPACT POLISH: Hit-stop & Shockwaves
+    let hitStopTimer = 0;             // When > 0, freezes physics briefly for heavy impact
     let shockwaves = [];              // Expanding radial ripple rings
 
-    // 🗼 2. DESTRUCTION TARGET: Collapsible Wooden Crate Pyramid Tower
+    // DESTRUCTION TARGET: Collapsible Wooden Crate Pyramid Tower
     let towerBlocks = [];             // Dynamic physical block entities
     let crateTexture = null;
 
@@ -381,7 +369,7 @@
       floorY: -2.6,
       sideX: 11.0,
       ceilY: 10.0,
-      // 植木鉢の初期位置: カメラ直前ではなく、前方の台座上に適度な距離で配置
+      // 植木鉢の初期位置: 左右のボタンに被らない自然な位置
       readyPos: new THREE.Vector3(0.55, -1.35, 1.1)
     };
 
@@ -393,7 +381,6 @@
     let dragHistory = [];
     let lastThrowTime = 0;
 
-    /* Web Audio System */
     function getAudioContext() {
       if (!audioCtx) {
         const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -412,7 +399,7 @@
       const now = ctx.currentTime;
       const safeInt = Math.min(Math.max(intensity, 0.5), 2.8);
 
-      // 1. Heavy Concussive Sub-Bass Blast
+      // Sub-bass impact
       const subOsc = ctx.createOscillator();
       const subGain = ctx.createGain();
       subOsc.type = 'sine';
@@ -425,33 +412,31 @@
       subOsc.start(now);
       subOsc.stop(now + 0.3);
 
-        // 4. Staggered Shard Clatters
-        const clatterCount = 5;
-        for (let i = 0; i < clatterCount; i++) {
-          const delay = 0.03 + i * 0.045 + Math.random() * 0.03;
-          setTimeout(() => {
-            if (!audioEnabled || !audioCtx) return;
-            const clinkOsc = ctx.createOscillator();
-            const clinkGain = ctx.createGain();
-            clinkOsc.frequency.setValueAtTime(3600 + Math.random() * 3200, ctx.currentTime);
-            clinkGain.gain.setValueAtTime(0.14 * safeInt, ctx.currentTime);
-            clinkGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
-            clinkOsc.connect(clinkGain);
-            clinkGain.connect(ctx.destination);
-            clinkOsc.start();
-            clinkOsc.stop(ctx.currentTime + 0.08);
-          }, delay * 1000);
-        }
+      // Shard Clatters
+      const clatterCount = 5;
+      for (let i = 0; i < clatterCount; i++) {
+        const delay = 0.03 + i * 0.045 + Math.random() * 0.03;
+        setTimeout(() => {
+          if (!audioEnabled || !audioCtx) return;
+          const clinkOsc = ctx.createOscillator();
+          const clinkGain = ctx.createGain();
+          clinkOsc.frequency.setValueAtTime(3600 + Math.random() * 3200, ctx.currentTime);
+          clinkGain.gain.setValueAtTime(0.14 * safeInt, ctx.currentTime);
+          clinkGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+          clinkOsc.connect(clinkGain);
+          clinkGain.connect(ctx.destination);
+          clinkOsc.start();
+          clinkOsc.stop(ctx.currentTime + 0.08);
+        }, delay * 1000);
       }
+    }
 
-    // 💥 特殊ポット専用サウンド（爆発・クリスタル・溶岩）
     function playExplosionAudio() {
       if (!audioEnabled) return;
       const ctx = getAudioContext();
       if (!ctx) return;
       const now = ctx.currentTime;
 
-      // Deep nuclear boom
       const boomOsc = ctx.createOscillator();
       const boomGain = ctx.createGain();
       boomOsc.type = 'sine';
@@ -464,7 +449,6 @@
       boomOsc.start(now);
       boomOsc.stop(now + 0.65);
 
-      // White noise explosion blast
       const nLen = Math.floor(ctx.sampleRate * 0.6);
       const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
       const d = nBuf.getChannelData(0);
@@ -492,7 +476,6 @@
       if (!ctx) return;
       const now = ctx.currentTime;
 
-      // High-pitched crystal bell ringings
       const freqs = [4200, 5600, 7200, 9400, 11500];
       freqs.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
@@ -515,7 +498,6 @@
       if (!ctx) return;
       const now = ctx.currentTime;
 
-      // Extreme 25Hz subterranean quake
       const sub = ctx.createOscillator();
       const subG = ctx.createGain();
       sub.type = 'sawtooth';
@@ -536,7 +518,6 @@
       const now = ctx.currentTime;
       const f = Math.min(Math.max(force, 0.4), 2.2);
 
-      // Heavy wooden/stone impact thud
       const thudOsc = ctx.createOscillator();
       const thudGain = ctx.createGain();
       thudOsc.type = 'triangle';
@@ -548,27 +529,6 @@
       thudGain.connect(ctx.destination);
       thudOsc.start(now);
       thudOsc.stop(now + 0.25);
-
-      // Wooden splinter / crack noise
-      const nLen = Math.floor(ctx.sampleRate * 0.2);
-      const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
-      const nData = nBuf.getChannelData(0);
-      for (let i = 0; i < nLen; i++) {
-        nData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.03));
-      }
-      const nSrc = ctx.createBufferSource();
-      nSrc.buffer = nBuf;
-      const fFilter = ctx.createBiquadFilter();
-      fFilter.type = 'bandpass';
-      fFilter.frequency.setValueAtTime(950, now);
-      fFilter.Q.setValueAtTime(2.0, now);
-      const nGain = ctx.createGain();
-      nGain.gain.setValueAtTime(0.65 * f, now);
-      nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-      nSrc.connect(fFilter);
-      fFilter.connect(nGain);
-      nGain.connect(ctx.destination);
-      nSrc.start(now);
     }
 
     function playThrowWhooshAudio(power = 1.0) {
@@ -739,13 +699,11 @@
       return new THREE.CanvasTexture(canvas);
     }
 
-    // 🌋 溶岩テクスチャ生成
     function generateMagmaTexture() {
       const canvas = createProceduralCanvas(512, 512, (ctx, w, h) => {
         ctx.fillStyle = '#181210';
         ctx.fillRect(0, 0, w, h);
 
-        // Cracks of glowing lava
         ctx.strokeStyle = '#ff4400';
         ctx.lineWidth = 8;
         ctx.shadowColor = '#ffaa00';
@@ -826,9 +784,9 @@
       const bD = 0.95;
       const crateGeo = new THREE.BoxGeometry(bW, bH, bD);
 
-      const baseZ = -9.8; // 奥の壁の直前に設置
+      const baseZ = -9.8;
       const startY = ARENA.floorY + bH * 0.5;
-      const levels = 5; // 5段（15個のブロック）ピラミッド
+      const levels = 5;
 
       for (let lvl = 0; lvl < levels; lvl++) {
         const countInRow = levels - lvl;
@@ -935,7 +893,6 @@
     }
 
     function setupEnvironment() {
-      // 1. Impact Target Front Wall
       const wallMat = new THREE.MeshStandardMaterial({
         map: generateWallTexture(),
         roughness: 0.82,
@@ -946,7 +903,6 @@
       wallMesh.receiveShadow = true;
       scene.add(wallMesh);
 
-      // Target Crosshair / Bullseye on the wall
       const targetCanvas = createProceduralCanvas(256, 256, (ctx, w, h) => {
         ctx.clearRect(0, 0, w, h);
         ctx.strokeStyle = 'rgba(255, 160, 40, 0.45)';
@@ -973,7 +929,6 @@
       targetMesh.position.set(0, 1.0, ARENA.wallZ + 0.02);
       scene.add(targetMesh);
 
-      // 2. Concrete Ground Floor
       const floorMat = new THREE.MeshStandardMaterial({
         map: generateFloorTexture(),
         roughness: 0.38,
@@ -985,7 +940,6 @@
       floor.receiveShadow = true;
       scene.add(floor);
 
-      // 3. Resting Table / Stand in front (カメラから離れた適切な位置に配置)
       const pedestalGeo = new THREE.CylinderGeometry(0.75, 0.9, 1.3, 32);
       const pedestalMat = new THREE.MeshStandardMaterial({
         color: 0x181a1f,
@@ -1050,7 +1004,6 @@
           metalness: 0.05
         });
       } else if (type === 'dynamite') {
-        // 💣 赤黒の危険ダイナマイトマテリアル
         bodyMat = new THREE.MeshStandardMaterial({
           color: 0xd91e18,
           roughness: 0.35,
@@ -1058,7 +1011,6 @@
           emissive: 0x550505
         });
       } else if (type === 'crystal') {
-        // 💎 半透明のクリスタルガラス
         bodyMat = new THREE.MeshStandardMaterial({
           color: 0x88e7ff,
           roughness: 0.06,
@@ -1067,7 +1019,6 @@
           opacity: 0.82
         });
       } else if (type === 'magma') {
-        // 🌋 脈動する巨大溶岩石
         scaleMult = 1.55;
         bodyMat = new THREE.MeshStandardMaterial({
           map: generateMagmaTexture(),
@@ -1108,7 +1059,6 @@
       bodyMesh.receiveShadow = true;
       group.add(bodyMesh);
 
-      // ダイナマイト鉢の場合は中央に導火線と火花を追加
       if (type === 'dynamite') {
         const fuseCurve = new THREE.CatmullRomCurve3([
           new THREE.Vector3(0, potH * 0.9, 0),
@@ -1198,7 +1148,6 @@
     }
 
     function spawnReadyPot() {
-      // If there's already a held pot that hasn't been thrown, keep it
       if (readyPot && readyPot.mesh) {
         return readyPot;
       }
@@ -1218,34 +1167,14 @@
 
       readyPot.mesh.position.copy(readyPot.initialPos);
       readyPot.mesh.rotation.set(0, Math.random() * Math.PI, 0);
-      // Start visibly small but quickly scale up
       readyPot.mesh.scale.set(0.1, 0.1, 0.1);
       scene.add(readyPot.mesh);
 
-      updateReloadUI(true);
       return readyPot;
-    }
-
-    function updateReloadUI(isReady) {
-      const reloadIndicator = document.getElementById('reload-indicator');
-      const reloadText = document.getElementById('reload-text');
-      if (reloadIndicator && reloadText) {
-        if (isReady) {
-          reloadIndicator.className = 'w-3 h-3 rounded-full bg-emerald-400 shadow-md shadow-emerald-400/80 animate-pulse';
-          reloadText.innerText = 'READY (発射可能)';
-          reloadText.className = 'text-xs font-bold text-emerald-300';
-        } else {
-          reloadIndicator.className = 'w-3 h-3 rounded-full bg-amber-400 shadow-md shadow-amber-400/80 animate-ping';
-          reloadText.innerText = 'RELOADING...';
-          reloadText.className = 'text-xs font-bold text-amber-300';
-        }
-      }
     }
 
     function scheduleAutoRespawn(delayMs = 280) {
       if (autoRespawnTimeout) clearTimeout(autoRespawnTimeout);
-      updateReloadUI(false);
-
       autoRespawnTimeout = setTimeout(() => {
         spawnReadyPot();
       }, delayMs);
@@ -1322,21 +1251,16 @@
       const hitSpeed = impactVel.length();
       const pType = flyingObj.potType || 'terracotta';
       const speedKmH = Math.round(hitSpeed * 3.6 * 4.4);
-      const impactForceKn = ((0.5 * 3.8 * (hitSpeed * hitSpeed)) / 0.04 / 1000).toFixed(1);
 
       analytics.smashes++;
       if (speedKmH > analytics.maxSpeed) analytics.maxSpeed = speedKmH;
-      if (parseFloat(impactForceKn) > analytics.maxForce) analytics.maxForce = parseFloat(impactForceKn);
 
       document.getElementById('stat-smashes').innerText = analytics.smashes;
-      document.getElementById('stat-speed').innerHTML = `${analytics.maxSpeed} <span class="text-xs font-semibold text-cyan-200">km/h</span>`;
-      document.getElementById('stat-force').innerHTML = `${analytics.maxForce} <span class="text-xs font-semibold text-rose-200">kN</span>`;
+      document.getElementById('stat-speed').innerHTML = `${analytics.maxSpeed} <span class="text-[9px]">km/h</span>`;
 
-      // Remove the shattered pot mesh from scene
       scene.remove(flyingObj.mesh);
 
       if (pType === 'dynamite') {
-        // 💣 ダイナマイト鉢の超爆発処理
         hitStopTimer = 0.08;
         cameraShake = 1.45;
         triggerFlashImpact();
@@ -1344,7 +1268,6 @@
         spawnShockwave(impactPos, new THREE.Vector3(0, 0, 1), 0xff3300, 14.0);
         showCrashTextPopup("💣 MEGA EXPLOSION!!");
 
-        // 爆風ブラスト：周囲半径6m以内のタワーブロックを猛烈に吹き飛ばす
         towerBlocks.forEach(tb => {
           const d = tb.mesh.position.distanceTo(impactPos);
           if (d < 6.5) {
@@ -1359,7 +1282,6 @@
         });
 
       } else if (pType === 'crystal') {
-        // 💎 クリスタルガラス鉢の破砕処理
         hitStopTimer = 0.045;
         cameraShake = 0.6;
         triggerFlashImpact();
@@ -1368,7 +1290,6 @@
         showCrashTextPopup("💎 CRYSTAL SHATTER!!");
 
       } else if (pType === 'magma') {
-        // 🌋 メガ・マグマ鉢の巨大激震処理
         hitStopTimer = 0.095;
         cameraShake = 1.8;
         triggerFlashImpact();
@@ -1376,7 +1297,6 @@
         spawnShockwave(impactPos, new THREE.Vector3(0, 0, 1), 0xff6600, 12.0);
         showCrashTextPopup("🌋 VOLCANIC CRUSH!!");
 
-        // 巨体による広範囲粉砕
         towerBlocks.forEach(tb => {
           const d = tb.mesh.position.distanceTo(impactPos);
           if (d < 4.2) {
@@ -1387,7 +1307,6 @@
         });
 
       } else {
-        // 通常ポットのヒットストップ・衝撃波
         hitStopTimer = 0.055;
         cameraShake = Math.min(hitSpeed * 0.09, 0.95);
         triggerFlashImpact();
@@ -1401,11 +1320,10 @@
         addWallImpactDecal(impactPos.x, impactPos.y);
       }
 
-      // 破片の生成（クリスタルの場合は140個の大量破片）
       const shardMultiplier = (pType === 'crystal') ? 3.0 : (pType === 'magma' ? 1.4 : 1.0);
       const baseCount = Math.floor(6 * shardMultiplier);
 
-      // 1. TIER 1: Base Disc Chunks
+      // Base Chunks
       for (let b = 0; b < baseCount; b++) {
         const baseSize = 0.28 + Math.random() * 0.18;
         const baseGeo = new THREE.CylinderGeometry(baseSize, baseSize * 1.1, 0.09, 5);
@@ -1428,10 +1346,9 @@
         scene.add(baseMesh);
       }
 
-      // 2. TIER 2: Jagged Ceramic Body Shards (45 fragments or 135 for crystal)
+      // Ceramic Body Shards
       const shardCount = Math.floor(45 * shardMultiplier);
       analytics.shards += shardCount;
-      document.getElementById('stat-shards').innerText = analytics.shards;
 
       for (let i = 0; i < shardCount; i++) {
         const sSize = 0.12 + Math.random() * 0.2;
@@ -1464,7 +1381,7 @@
         scene.add(shardMesh);
       }
 
-      // 3. TIER 3: Cohesive Root Ball
+      // Root Ball
       const rootBallGeo = new THREE.DodecahedronGeometry(0.32, 1);
       const rootBallMesh = new THREE.Mesh(rootBallGeo, flyingObj.soilMat);
       rootBallMesh.position.copy(impactPos).add(new THREE.Vector3(0, 0, 0.15));
@@ -1477,7 +1394,7 @@
       });
       scene.add(rootBallMesh);
 
-      // 4. Loose Organic Soil Particles
+      // Soil Particles
       const soilCount = 80;
       for (let s = 0; s < soilCount; s++) {
         const soilGeo = new THREE.DodecahedronGeometry(0.045 + Math.random() * 0.065, 0);
@@ -1500,7 +1417,7 @@
         scene.add(soilMesh);
       }
 
-      // 5. Plant Foliage Detaching
+      // Detaching Leaves
       const foliageCount = 9;
       for (let f = 0; f < foliageCount; f++) {
         const leafGeo = new THREE.PlaneGeometry(0.32, 0.5);
@@ -1517,7 +1434,6 @@
         scene.add(leafMesh);
       }
 
-      // 6. Volumetric Dust Smoke
       spawnDustExplosion(impactPos);
     }
 
@@ -1551,7 +1467,6 @@
     }
 
     function emitPotTrail(pos) {
-      // Small dust/air-vortex puffs trailing behind fast pot
       const trailGeo = new THREE.SphereGeometry(0.12, 4, 4);
       const trailMat = new THREE.MeshBasicMaterial({
         color: 0xffa055,
@@ -1595,7 +1510,6 @@
     const FRICTION = 0.88;
 
     function stepPhysics(delta) {
-      // 💥 HIT-STOP: 衝突瞬間に物理演算を瞬間停止させ、重い手応えを生む
       if (hitStopTimer > 0) {
         hitStopTimer -= delta;
         updateCameraMotion(delta * 0.5);
@@ -1604,7 +1518,6 @@
 
       const effDt = Math.min(delta, 0.05) * timeScale;
 
-      // 0. Holding pot scaling animation
       if (readyPot && readyPot.mesh) {
         if (readyPot.spawnProgress < 1.0) {
           readyPot.spawnProgress = Math.min(1.0, readyPot.spawnProgress + effDt * 7.0);
@@ -1614,7 +1527,7 @@
         }
       }
 
-      // 1. ALL Flying Pots in Air (Multi-projectile physics!)
+      // Flying Pots (Multi-projectile)
       for (let p = flyingPots.length - 1; p >= 0; p--) {
         const fp = flyingPots[p];
 
@@ -1635,7 +1548,7 @@
           emitPotTrail(fp.mesh.position);
         }
 
-        // 🗼 COLLISION: Check impact with Pyramid Tower Blocks
+        // Tower Collision
         let hitTower = false;
         for (let tb of towerBlocks) {
           const distToBlock = fp.mesh.position.distanceTo(tb.mesh.position);
@@ -1649,7 +1562,6 @@
             tb.vel.copy(hitDir).multiplyScalar(potSpeed * 0.75).add(new THREE.Vector3(0, 3.5, 0));
             tb.angVel.set((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16);
 
-            // 連鎖衝撃：周囲のブロックも巻き込んでピラミッド全体が大崩落
             for (let other of towerBlocks) {
               if (other === tb) continue;
               const d = tb.mesh.position.distanceTo(other.mesh.position);
@@ -1672,21 +1584,21 @@
         }
         if (hitTower) continue;
 
-        // Front Target Wall Collision
+        // Wall collision
         if (fp.mesh.position.z <= ARENA.wallZ + 0.5) {
           shatterPot(fp);
           flyingPots.splice(p, 1);
           continue;
         }
 
-        // Floor Collision
+        // Floor collision
         if (fp.mesh.position.y <= ARENA.floorY + 0.48) {
           shatterPot(fp);
           flyingPots.splice(p, 1);
           continue;
         }
 
-        // Side Walls Collision
+        // Side walls
         if (Math.abs(fp.mesh.position.x) >= ARENA.sideX) {
           shatterPot(fp);
           flyingPots.splice(p, 1);
@@ -1694,7 +1606,7 @@
         }
       }
 
-      // 2. Flying Trails Fade
+      // Trails
       for (let tr = potTrails.length - 1; tr >= 0; tr--) {
         const t = potTrails[tr];
         t.opacity -= 1.8 * effDt;
@@ -1707,7 +1619,7 @@
         }
       }
 
-      // 3. Ceramic Shards Physics
+      // Shards
       for (let i = shards.length - 1; i >= 0; i--) {
         const s = shards[i];
         if (s.isResting) continue;
@@ -1737,7 +1649,7 @@
         }
       }
 
-      // 4. Soil Particles Physics
+      // Soil Particles
       for (let s of soilParticles) {
         if (s.isResting) continue;
         s.vel.y += (GRAVITY * 1.3) * effDt;
@@ -1752,7 +1664,7 @@
         }
       }
 
-      // 5. Root Ball Core
+      // Root Ball
       for (let rb of rootBallDebris) {
         if (rb.isResting) continue;
         rb.vel.y += GRAVITY * effDt;
@@ -1765,7 +1677,7 @@
         }
       }
 
-      // 6. Foliage Aerodynamics
+      // Foliage
       for (let l of foliagePieces) {
         l.flutter += effDt * 9;
         l.vel.y += (GRAVITY * 0.28) * effDt;
@@ -1781,7 +1693,7 @@
         }
       }
 
-      // 7. Dust Cloud Fade
+      // Dust Clouds
       for (let d = dustClouds.length - 1; d >= 0; d--) {
         const dust = dustClouds[d];
         dust.mesh.position.addScaledVector(dust.vel, effDt);
@@ -1795,7 +1707,7 @@
         }
       }
 
-      // 💥 8. Shockwave Ripple Expansion & Fade
+      // Shockwaves
       for (let sw = shockwaves.length - 1; sw >= 0; sw--) {
         const wave = shockwaves[sw];
         wave.radius += wave.expandSpeed * effDt;
@@ -1810,7 +1722,7 @@
         }
       }
 
-      // 🗼 9. Tower Blocks Dynamic Physics (バウンド、転がり、散乱)
+      // Tower Blocks
       for (let tb of towerBlocks) {
         if (!tb.isHit || tb.isResting) continue;
 
@@ -1821,7 +1733,6 @@
         tb.mesh.rotation.y += tb.angVel.y * effDt;
         tb.mesh.rotation.z += tb.angVel.z * effDt;
 
-        // Floor collision
         const bottomY = ARENA.floorY + tb.size.y * 0.5;
         if (tb.mesh.position.y <= bottomY) {
           tb.mesh.position.y = bottomY;
@@ -1839,13 +1750,11 @@
           }
         }
 
-        // Back Wall collision
         if (tb.mesh.position.z <= ARENA.wallZ + tb.size.z * 0.5) {
           tb.mesh.position.z = ARENA.wallZ + tb.size.z * 0.5;
           tb.vel.z = Math.abs(tb.vel.z) * 0.4;
         }
 
-        // Side Walls
         if (Math.abs(tb.mesh.position.x) >= ARENA.sideX - 0.5) {
           tb.vel.x = -tb.vel.x * 0.4;
         }
@@ -1908,7 +1817,6 @@
       const aimTarget = document.getElementById('aim-target');
 
       function onPointerStart(e) {
-        // 複数指や他のポインターによる同時押し・誤作動をブロック
         if (isPointerDown && activePointerId !== null && activePointerId !== e.pointerId) return;
 
         activePointerId = e.pointerId;
@@ -1923,7 +1831,6 @@
         dragCurrent = { x: e.clientX, y: e.clientY, time: now };
         dragHistory = [{ x: e.clientX, y: e.clientY, time: now }];
 
-        // Update Wall Target Marker in 3D
         const hit = getWallIntersectPoint(e.clientX, e.clientY);
         if (hit) {
           currentAimTarget.copy(hit);
@@ -1953,7 +1860,6 @@
 
       function onPointerMove(e) {
         if (!isPointerDown || e.pointerId !== activePointerId) {
-          // ホバー時は3D壁面マーカーのみ追従
           const hit = getWallIntersectPoint(e.clientX, e.clientY);
           if (hit) {
             currentAimTarget.copy(hit);
@@ -1991,7 +1897,6 @@
           aimLine.setAttribute('x2', e.clientX);
           aimLine.setAttribute('y2', e.clientY);
 
-          // ドラッグに応じた手元鉢の微細な傾き演出
           if (readyPot && readyPot.mesh) {
             readyPot.mesh.position.x = readyPot.initialPos.x + (dx / window.innerWidth) * 1.5;
             readyPot.mesh.position.y = readyPot.initialPos.y - (dy / window.innerHeight) * 1.0;
@@ -2019,7 +1924,6 @@
         aimLine.setAttribute('y2', '0');
 
         const now = performance.now();
-        // 2重発火（ゴーストクリック・ダブルイベント）を完全に遮断するクールダウン判定
         if (now - lastThrowTime < 130) {
           return;
         }
@@ -2041,7 +1945,6 @@
         let targetPoint = currentAimTarget.clone();
         let flightDuration = 0.54;
 
-        // CASE 1: DIRECT TAP ON WALL (壁直接タップ)
         if (totalDist < 25) {
           const directHit = getWallIntersectPoint(e.clientX, e.clientY);
           if (directHit) {
@@ -2050,7 +1953,6 @@
           createTapRippleUI(e.clientX, e.clientY);
           flightDuration = 0.52;
         } else {
-          // CASE 2: DRAGGED / SLINGSHOT / FLICK
           if (dy > 30) {
             const pullFactorX = (-dx / window.innerWidth) * 16.0;
             const pullFactorY = (dy / window.innerHeight) * 8.0;
@@ -2078,7 +1980,6 @@
         launchPotToTarget(targetPoint, flightDuration);
       }
 
-      // PointerEventに一本化（touchstart/touchendとmousedown/mouseupの多重登録を全廃）
       container.addEventListener('pointerdown', onPointerStart);
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerEnd);
@@ -2093,7 +1994,6 @@
 
     function launchPotToTarget(targetPoint, duration = 0.52) {
       if (isShotgunMode) {
-        // 🎆 3連ショットガン：扇状に3個の鉢を一斉射出！
         const spreads = [-2.4, 0, 2.4];
         spreads.forEach((spreadX, idx) => {
           setTimeout(() => {
@@ -2152,18 +2052,17 @@
       scheduleAutoRespawn(260);
     }
 
-    // 🎆 3連ショットガンモードのトグル
     function toggleShotgunMode() {
       isShotgunMode = !isShotgunMode;
       const btn = document.getElementById('shotgun-toggle-btn');
       const label = document.getElementById('shotgun-label');
       if (isShotgunMode) {
         btn.classList.add('shotgun-active');
-        label.innerText = '3連射: ON (ACTIVE)';
+        label.innerText = '3連:ON';
         showToast('🎆 3連ショットガン射出モード ON！');
       } else {
         btn.classList.remove('shotgun-active');
-        label.innerText = '3連射: OFF';
+        label.innerText = '3連:OFF';
         showToast('単発投擲モードに戻りました');
       }
     }
@@ -2177,13 +2076,8 @@
 
     function cycleCameraView() {
       cameraMode = (cameraMode + 1) % cameraConfigs.length;
-      const cfg = cameraConfigs[cameraMode];
-      const label = document.getElementById('cam-label');
-      if (label) {
-        label.innerText = `視点: ${cfg.label}`;
-      }
       updateCameraPositionImmediate();
-      showToast(`カメラ切替: ${cfg.label}`);
+      showToast(`視点: ${cameraConfigs[cameraMode].label}`);
     }
 
     function updateCameraPositionImmediate() {
@@ -2209,11 +2103,11 @@
       const typeNames = {
         terracotta: '素焼き鉢',
         glazed: '瑠璃青磁鉢',
-        porcelain: '白磁花柄鉢',
-        concrete: '重モルタル鉢',
-        dynamite: '💣 特製ダイナマイト鉢 (大爆風ブラスト)',
-        crystal: '💎 クリスタルガラス鉢 (140破片 & パリン音)',
-        magma: '🌋 メガ・マグマ鉢 (超重量・地響き)'
+        porcelain: '白磁鉢',
+        concrete: 'モルタル鉢',
+        dynamite: '💣 爆弾鉢 (大爆風ブラスト)',
+        crystal: '💎 水晶鉢 (140破片 & パリン音)',
+        magma: '🌋 溶岩鉢 (超重量・地響き)'
       };
       showToast(`${typeNames[type] || type} を構えました！`);
     }
@@ -2231,13 +2125,10 @@
       isSlowMo = !isSlowMo;
       timeScale = isSlowMo ? 0.18 : 1.0;
       const btn = document.getElementById('slowmo-btn');
-      const label = document.getElementById('slowmo-label');
       if (isSlowMo) {
-        label.innerText = 'スロー (0.18x)';
         btn.classList.add('bg-cyan-500/25', 'border-cyan-400');
         showToast('スーパースローモーション ON');
       } else {
-        label.innerText = '通常速';
         btn.classList.remove('bg-cyan-500/25', 'border-cyan-400');
       }
     }
@@ -2260,19 +2151,18 @@
       shockwaves = [];
 
       buildPyramidTower();
-
-      showToast('破片と壁の傷を清掃し、タワーを再構築しました！');
+      showToast('破片と壁を清掃し、タワーを再構築しました！');
     }
 
     function toggleAudio() {
       audioEnabled = !audioEnabled;
       const btn = document.getElementById('sound-btn');
       if (audioEnabled) {
-        btn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+        btn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
         getAudioContext();
         showToast('立体音響 ON');
       } else {
-        btn.innerHTML = '<i class="fa-solid fa-volume-xmark text-slate-500"></i>';
+        btn.innerHTML = '<i class="fa-solid fa-volume-xmark text-sm text-slate-500"></i>';
         showToast('サウンド OFF');
       }
     }
