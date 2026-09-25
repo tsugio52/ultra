@@ -30,17 +30,13 @@
       left: 0;
       width: 100%;
       height: 100%;
-      cursor: grab;
+      cursor: crosshair;
       touch-action: none;
-    }
-    
-    #canvas-container:active {
-      cursor: grabbing;
     }
 
     /* Glass UI effect */
     .glass-card {
-      background: rgba(14, 18, 27, 0.78);
+      background: rgba(14, 18, 27, 0.82);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -54,7 +50,7 @@
     }
     
     .glass-btn:hover {
-      background: rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.2);
       transform: translateY(-2px);
       box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3);
     }
@@ -89,12 +85,19 @@
     }
 
     /* Target Reticle Pulsing */
-    @keyframes reticlePulse {
-      0%, 100% { transform: scale(1); opacity: 0.85; }
-      50% { transform: scale(1.15); opacity: 1; }
+    @keyframes rippleAnim {
+      0% { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
     }
-    .reticle-pulse {
-      animation: reticlePulse 1.2s infinite ease-in-out;
+    .tap-ripple {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: 3px solid #fb923c;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: rippleAnim 0.45s ease-out forwards;
+      z-index: 25;
     }
 
     /* Impact flash */
@@ -105,7 +108,45 @@
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.08s ease-out;
-      z-index: 20;
+      z-index: 30;
+    }
+
+    /* Dynamic Tower Crash text popup */
+    @keyframes crashPopupAnim {
+      0% { transform: translate(-50%, -50%) scale(0.4) rotate(-8deg); opacity: 0; }
+      20% { transform: translate(-50%, -50%) scale(1.25) rotate(4deg); opacity: 1; }
+      40% { transform: translate(-50%, -50%) scale(1.0) rotate(0deg); opacity: 1; }
+      80% { transform: translate(-50%, -50%) scale(1.05) rotate(-2deg); opacity: 0.9; }
+      100% { transform: translate(-50%, -85%) scale(1.3) rotate(0deg); opacity: 0; }
+    }
+    .crash-popup {
+      position: absolute;
+      top: 38%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 35;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      animation: crashPopupAnim 0.85s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+      text-shadow: 0 0 24px rgba(249, 115, 22, 0.85), 0 4px 14px rgba(0, 0, 0, 0.95);
+    }
+
+    /* Horizontal scrollbar hidden for compact mobile toolbar */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Shotgun Mode active glow */
+    .shotgun-active {
+      background: linear-gradient(135deg, #a855f7, #ec4899) !important;
+      box-shadow: 0 0 20px rgba(236, 72, 153, 0.6) !important;
+      border-color: rgba(255, 255, 255, 0.6) !important;
     }
   </style>
 </head>
@@ -120,8 +161,8 @@
 
   <!-- Trajectory drag guide SVG -->
   <svg id="trajectory-svg" class="w-full h-full">
-    <line id="aim-line" x1="0" y1="0" x2="0" y2="0" stroke="rgba(251, 146, 60, 0.75)" stroke-width="3" stroke-dasharray="6 4" stroke-linecap="round" />
-    <circle id="aim-target" cx="0" cy="0" r="14" fill="rgba(249, 115, 22, 0.25)" stroke="#fb923c" stroke-width="2" />
+    <line id="aim-line" x1="0" y1="0" x2="0" y2="0" stroke="rgba(251, 146, 60, 0.85)" stroke-width="3.5" stroke-dasharray="8 6" stroke-linecap="round" />
+    <circle id="aim-target" cx="0" cy="0" r="14" fill="rgba(249, 115, 22, 0.3)" stroke="#fb923c" stroke-width="2.5" />
   </svg>
 
   <!-- Top Bar: Metrics & Branding -->
@@ -135,14 +176,14 @@
           <h1 class="text-base font-black tracking-wider text-white">POTTERY SMASH 3D</h1>
           <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-orange-500 to-rose-500 text-white uppercase">Ultra</span>
         </div>
-        <p class="text-xs text-amber-300/90 font-medium">壁に思いきり叩きつけて粉砕するシミュレーター</p>
+        <p class="text-xs text-amber-300/90 font-medium">壁を直接タップで照準発射！連打・スワイプ対応</p>
       </div>
     </div>
 
     <!-- Ammo / Auto-Reload Indicator -->
     <div class="hidden sm:flex items-center glass-card rounded-2xl px-3.5 py-2 space-x-2 pointer-events-auto">
       <div id="reload-indicator" class="w-3 h-3 rounded-full bg-emerald-400 shadow-md shadow-emerald-400/80 animate-pulse"></div>
-      <span id="reload-text" class="text-xs font-bold text-slate-200">READY (自動補充中)</span>
+      <span id="reload-text" class="text-xs font-bold text-emerald-300">READY (発射可能)</span>
     </div>
 
     <!-- Live Telemetry Display -->
@@ -167,25 +208,25 @@
   </div>
 
   <!-- Throw Guidance / Dynamic Power Reticle -->
-  <div id="reticle-hud" class="absolute pointer-events-none z-10 transition-opacity duration-150 opacity-0 flex flex-col items-center">
-    <div class="relative w-24 h-24 flex items-center justify-center">
+  <div id="reticle-hud" class="absolute pointer-events-none z-15 transition-opacity duration-150 opacity-0 flex flex-col items-center">
+    <div class="relative w-20 h-20 flex items-center justify-center">
       <div id="power-ring" class="absolute inset-0 rounded-full border-4 border-amber-400/80 border-t-transparent animate-spin"></div>
-      <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-orange-500 to-rose-500 shadow-xl shadow-orange-500/80"></div>
+      <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-orange-500 to-rose-500 shadow-xl shadow-orange-500/80"></div>
     </div>
-    <div id="power-gauge" class="mt-2 px-3.5 py-1 bg-black/80 backdrop-blur-md border border-orange-500/50 rounded-full text-xs font-black tracking-widest text-amber-300">
-      POWER 0%
+    <div id="power-gauge" class="mt-1 px-3 py-1 bg-black/80 backdrop-blur-md border border-orange-500/50 rounded-full text-[11px] font-black tracking-widest text-amber-300">
+      AIM
     </div>
   </div>
 
   <!-- First Time User Tutorial / Hint -->
   <div id="guide-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass-card rounded-3xl p-6 text-center max-w-sm pointer-events-none z-20 transition-all duration-500 shadow-2xl">
     <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-3xl mb-3.5 shadow-lg shadow-orange-500/40 animate-pulse">
-      <i class="fa-solid fa-crosshairs"></i>
+      <i class="fa-solid fa-bullseye"></i>
     </div>
-    <h2 class="text-lg font-black text-white mb-1">狙った場所に叩きつけろ！</h2>
+    <h2 class="text-lg font-black text-white mb-1">壁をタップして直撃破壊！</h2>
     <p class="text-xs text-slate-300 leading-relaxed mb-4">
-      壁の壊したい場所に向かって<strong class="text-amber-300">スワイプ／フリック</strong>するか、<strong class="text-orange-400">壁を直接タップ</strong>して狙い撃ち！<br>
-      投げた後は<span class="text-emerald-300 font-bold">自動的に次の鉢がセット</span>されるので次々投げ込めます。
+      壁の壊したい場所を<strong class="text-amber-300">ポンと直接タップ</strong>すると、手元から鉢が一直線に飛んでいって大激突！<br>
+      <span class="text-orange-400 font-bold">連打タップで連続投擲</span>や、長押しスワイプで引っ張り投球も可能です。
     </p>
     <div class="inline-block px-3 py-1 rounded-full bg-white/10 text-[11px] text-amber-200 font-semibold border border-white/10">
       ⚡ スペースキーで即座に連続全力投球可能
@@ -194,55 +235,75 @@
 
   <!-- Bottom Control Dock -->
   <div class="absolute bottom-5 left-4 right-4 flex flex-col md:flex-row items-center justify-between gap-3 pointer-events-none z-20">
-    <!-- Left: Pottery Type Selection -->
-    <div class="glass-card rounded-2xl p-1.5 flex items-center space-x-1 pointer-events-auto">
-      <button id="type-terracotta" onclick="setPotType('terracotta')" class="pot-type-btn active px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md">
+    <!-- Left: Pottery Type Selection (Standard & Special Pots) -->
+    <div class="glass-card rounded-2xl p-1.5 flex items-center space-x-1 pointer-events-auto overflow-x-auto no-scrollbar max-w-full">
+      <button id="type-terracotta" onclick="setPotType('terracotta')" class="pot-type-btn active px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md shrink-0">
         <i class="fa-solid fa-seedling"></i>
-        <span>素焼き鉢</span>
+        <span>素焼き</span>
       </button>
-      <button id="type-glazed" onclick="setPotType('glazed')" class="pot-type-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-white/10 transition">
+      <button id="type-glazed" onclick="setPotType('glazed')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition shrink-0">
         <i class="fa-solid fa-gem"></i>
-        <span>瑠璃青磁鉢</span>
+        <span>瑠璃青磁</span>
       </button>
-      <button id="type-porcelain" onclick="setPotType('porcelain')" class="pot-type-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-white/10 transition">
+      <button id="type-porcelain" onclick="setPotType('porcelain')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition shrink-0">
         <i class="fa-solid fa-leaf"></i>
-        <span>白磁花柄鉢</span>
+        <span>白磁</span>
       </button>
-      <button id="type-concrete" onclick="setPotType('concrete')" class="pot-type-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-white/10 transition">
+      <button id="type-concrete" onclick="setPotType('concrete')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition shrink-0">
         <i class="fa-solid fa-cube"></i>
-        <span>重モルタル鉢</span>
+        <span>モルタル</span>
+      </button>
+
+      <!-- 💥 特殊ポット：ダイナマイト・クリスタル・メガマグマ -->
+      <div class="h-5 w-[1px] bg-white/20 mx-1 shrink-0"></div>
+
+      <button id="type-dynamite" onclick="setPotType('dynamite')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-rose-300 hover:text-white hover:bg-rose-600/30 border border-rose-500/30 transition shrink-0" title="爆風でブロックタワーを一網打尽">
+        <i class="fa-solid fa-bomb text-rose-400"></i>
+        <span>💣 爆弾</span>
+      </button>
+      <button id="type-crystal" onclick="setPotType('crystal')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-cyan-300 hover:text-white hover:bg-cyan-600/30 border border-cyan-500/30 transition shrink-0" title="140個以上の光の破片と極上ガラス破砕音">
+        <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
+        <span>💎 水晶</span>
+      </button>
+      <button id="type-magma" onclick="setPotType('magma')" class="pot-type-btn px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 text-amber-300 hover:text-white hover:bg-amber-600/30 border border-amber-500/30 transition shrink-0" title="超重量！地響きとともに壁を破砕">
+        <i class="fa-solid fa-volcano text-amber-400"></i>
+        <span>🌋 溶岩</span>
       </button>
     </div>
 
-    <!-- Center: Fast Throw Trigger (For touch/click instant action) -->
+    <!-- Center: Fast Throw Trigger & Shotgun Toggle -->
     <div class="pointer-events-auto flex items-center space-x-2">
-      <button onclick="forceThrow(1.6)" class="glass-btn px-5 py-3 rounded-2xl text-xs font-black text-white bg-gradient-to-r from-orange-500 to-rose-600 shadow-lg shadow-orange-600/40 flex items-center space-x-2">
+      <button id="shotgun-toggle-btn" onclick="toggleShotgunMode()" class="glass-btn px-4 py-3 rounded-2xl text-xs font-black text-slate-200 border border-purple-400/30 flex items-center space-x-1.5 hover:text-white" title="1タップで3個同時に扇状射出">
+        <i class="fa-solid fa-burst text-purple-400"></i>
+        <span id="shotgun-label">3連射: OFF</span>
+      </button>
+
+      <button onclick="forceThrow(1.5)" class="glass-btn px-5 py-3 rounded-2xl text-xs font-black text-white bg-gradient-to-r from-orange-500 to-rose-600 shadow-lg shadow-orange-600/40 flex items-center space-x-2">
         <i class="fa-solid fa-meteor text-amber-200 text-sm"></i>
-        <span>全力投球 (MAX THROW!)</span>
+        <span>全力投球 (MAX)</span>
       </button>
     </div>
 
     <!-- Right: Utilities & Camera Modes -->
     <div class="glass-card rounded-2xl p-1.5 flex items-center space-x-1.5 pointer-events-auto">
-      <!-- Camera View Toggle -->
+      <button onclick="resetTower()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-amber-300 flex items-center space-x-1.5 hover:bg-amber-500/20" title="ピラミッドタワーを再構築">
+        <i class="fa-solid fa-cubes-stacked text-amber-400"></i>
+        <span>タワー再建</span>
+      </button>
       <button id="cam-toggle-btn" onclick="cycleCameraView()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-200 flex items-center space-x-1.5" title="カメラ視点切替">
         <i class="fa-solid fa-video text-amber-400"></i>
         <span id="cam-label">視点: 投擲手</span>
       </button>
-      <!-- Slow Motion -->
       <button id="slowmo-btn" onclick="toggleSlowMo()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-200 flex items-center space-x-1.5" title="スローモーション">
         <i class="fa-solid fa-gauge-high text-cyan-400"></i>
         <span id="slowmo-label">通常速</span>
       </button>
-      <!-- Reset Pot -->
-      <button onclick="respawnPot()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-amber-400" title="新しい鉢を構える">
+      <button onclick="respawnReadyPot()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-amber-400" title="新しい鉢を構える">
         <i class="fa-solid fa-rotate-left"></i>
       </button>
-      <!-- Clean Debris & Wall -->
       <button onclick="clearRoom()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-rose-400" title="破片と壁の傷を清掃">
         <i class="fa-solid fa-broom"></i>
       </button>
-      <!-- Audio Toggle -->
       <button id="sound-btn" onclick="toggleAudio()" class="glass-btn px-3 py-2 rounded-xl text-xs font-bold text-amber-400" title="サウンド切り替え">
         <i class="fa-solid fa-volume-high"></i>
       </button>
@@ -257,14 +318,27 @@
   <script>
     /* Global Simulation State */
     let scene, camera, renderer;
-    let currentPot = null;
+    let readyPot = null;              // Currently held/readied pot at the pedestal/hand
+    let flyingPots = [];              // Multi-projectile array: allows continuous machine-gun throws!
     let shards = [];
     let soilParticles = [];
     let rootBallDebris = [];
     let foliagePieces = [];
     let dustClouds = [];
+    let potTrails = [];               // Streamline particle trail behind flying pots
     let wallImpactDecals = [];
     let speedLinesActive = false;
+
+    // 💥 特殊ポット & 3連乱射ステート
+    let isShotgunMode = false;        // When true, fires 3 pots in a wide spread!
+
+    // 💥 1. IMPACT POLISH: Hit-stop & Shockwaves
+    let hitStopTimer = 0;             // When > 0, freezes physics briefly for bone-crushing punch
+    let shockwaves = [];              // Expanding radial ripple rings
+
+    // 🗼 2. DESTRUCTION TARGET: Collapsible Wooden Crate Pyramid Tower
+    let towerBlocks = [];             // Dynamic physical block entities
+    let crateTexture = null;
 
     // Raycasting & Aiming System
     let raycaster, mouseNorm;
@@ -280,13 +354,13 @@
     let audioCtx = null;
     let activePotType = 'terracotta';
 
-    // Camera Modes: 全ての視点で「手元の鉢」「奥の壁」「飛翔軌道」「散乱する破片」が同時に美しく収まるアングル
+    // Camera Modes: 手元と奥の壁の両方が心地よい視野で収まるアングル
     let cameraMode = 0;
     const cameraConfigs = [
-      { label: '投擲手 (FPS)', pos: new THREE.Vector3(0, 0.45, 4.2), target: new THREE.Vector3(0, 0.8, -12.5) },
-      { label: '斜め上俯瞰', pos: new THREE.Vector3(6.5, 4.8, 4.8), target: new THREE.Vector3(-0.4, 0.0, -5.5) }, // ★手前と奥を一望できる新アングル
-      { label: '肩越し (TPS)', pos: new THREE.Vector3(2.2, 1.0, 4.6), target: new THREE.Vector3(-0.2, 0.8, -12.5) },
-      { label: '側面広角 (シネマ)', pos: new THREE.Vector3(7.8, 1.8, -2.5), target: new THREE.Vector3(0, 0.3, -6.5) }
+      { label: '投擲手 (FPS)', pos: new THREE.Vector3(0, 0.65, 4.2), target: new THREE.Vector3(0, 0.7, -12.5) },
+      { label: '斜め上俯瞰', pos: new THREE.Vector3(5.6, 4.0, 3.6), target: new THREE.Vector3(-0.3, 0.0, -5.0) },
+      { label: '肩越し (TPS)', pos: new THREE.Vector3(1.7, 1.05, 3.9), target: new THREE.Vector3(-0.15, 0.7, -12.5) },
+      { label: '側面広角 (シネマ)', pos: new THREE.Vector3(7.2, 1.5, -2.0), target: new THREE.Vector3(0, 0.2, -6.0) }
     ];
     let baseCameraPos = new THREE.Vector3().copy(cameraConfigs[0].pos);
     let cameraOffset = new THREE.Vector3(0, 0, 0);
@@ -307,17 +381,19 @@
       floorY: -2.6,
       sideX: 11.0,
       ceilY: 10.0,
-      pedestalZ: 1.6
+      // 植木鉢の初期位置: カメラ直前ではなく、前方の台座上に適度な距離で配置
+      readyPos: new THREE.Vector3(0.55, -1.35, 1.1)
     };
 
-    // Interaction handling
-    let isDragging = false;
-    let dragStart = { x: 0, y: 0, time: 0 };
+    // Interaction handling & anti-duplicate firing state
+    let activePointerId = null;
+    let isPointerDown = false;
+    let pointerDownPos = { x: 0, y: 0, time: 0 };
     let dragCurrent = { x: 0, y: 0, time: 0 };
-    let dragHistory = []; // For velocity curve & throwing speed
-    let potReady = true;
+    let dragHistory = [];
+    let lastThrowTime = 0;
 
-    /* Initialize Web Audio Context */
+    /* Web Audio System */
     function getAudioContext() {
       if (!audioCtx) {
         const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -329,13 +405,6 @@
       return audioCtx;
     }
 
-    /**
-     * Synthesizes an ultra-realistic impact sound combining:
-     * 1. Sub-bass concussive blast (30-90Hz)
-     * 2. High ceramic shatter transient (white noise + multi-resonant peaks)
-     * 3. Wet soil splat (muddy mass collision)
-     * 4. Secondary tumbling shard rattles
-     */
     function playAuthenticImpactAudio(intensity = 1.0) {
       if (!audioEnabled) return;
       const ctx = getAudioContext();
@@ -343,11 +412,11 @@
       const now = ctx.currentTime;
       const safeInt = Math.min(Math.max(intensity, 0.5), 2.8);
 
-      // 1. Heavy Concussive Sub-Bass Blast (Impact body punch)
+      // 1. Heavy Concussive Sub-Bass Blast
       const subOsc = ctx.createOscillator();
       const subGain = ctx.createGain();
       subOsc.type = 'sine';
-      subOsc.frequency.setValueAtTime(120, now);
+      subOsc.frequency.setValueAtTime(125, now);
       subOsc.frequency.exponentialRampToValueAtTime(32, now + 0.22);
       subGain.gain.setValueAtTime(1.0 * safeInt, now);
       subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
@@ -356,77 +425,159 @@
       subOsc.start(now);
       subOsc.stop(now + 0.3);
 
-      // 2. High Ceramic Fracture Crack (Piercing, explosive snap)
-      const noiseLen = Math.floor(ctx.sampleRate * 0.45);
-      const noiseBuffer = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
-      const out = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < noiseLen; i++) {
-        out[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.04));
+        // 4. Staggered Shard Clatters
+        const clatterCount = 5;
+        for (let i = 0; i < clatterCount; i++) {
+          const delay = 0.03 + i * 0.045 + Math.random() * 0.03;
+          setTimeout(() => {
+            if (!audioEnabled || !audioCtx) return;
+            const clinkOsc = ctx.createOscillator();
+            const clinkGain = ctx.createGain();
+            clinkOsc.frequency.setValueAtTime(3600 + Math.random() * 3200, ctx.currentTime);
+            clinkGain.gain.setValueAtTime(0.14 * safeInt, ctx.currentTime);
+            clinkGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+            clinkOsc.connect(clinkGain);
+            clinkGain.connect(ctx.destination);
+            clinkOsc.start();
+            clinkOsc.stop(ctx.currentTime + 0.08);
+          }, delay * 1000);
+        }
       }
-      const noiseSrc = ctx.createBufferSource();
-      noiseSrc.buffer = noiseBuffer;
 
-      const bandFilter = ctx.createBiquadFilter();
-      bandFilter.type = 'bandpass';
-      bandFilter.frequency.setValueAtTime(3200, now);
-      bandFilter.Q.setValueAtTime(3.0, now);
+    // 💥 特殊ポット専用サウンド（爆発・クリスタル・溶岩）
+    function playExplosionAudio() {
+      if (!audioEnabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
 
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.85 * safeInt, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      // Deep nuclear boom
+      const boomOsc = ctx.createOscillator();
+      const boomGain = ctx.createGain();
+      boomOsc.type = 'sine';
+      boomOsc.frequency.setValueAtTime(160, now);
+      boomOsc.frequency.exponentialRampToValueAtTime(24, now + 0.55);
+      boomGain.gain.setValueAtTime(1.8, now);
+      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      boomOsc.connect(boomGain);
+      boomGain.connect(ctx.destination);
+      boomOsc.start(now);
+      boomOsc.stop(now + 0.65);
 
-      noiseSrc.connect(bandFilter);
-      bandFilter.connect(noiseGain);
-      noiseGain.connect(ctx.destination);
-      noiseSrc.start(now);
+      // White noise explosion blast
+      const nLen = Math.floor(ctx.sampleRate * 0.6);
+      const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+      const d = nBuf.getChannelData(0);
+      for (let i = 0; i < nLen; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.12));
+      }
+      const nSrc = ctx.createBufferSource();
+      nSrc.buffer = nBuf;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(1800, now);
+      f.frequency.exponentialRampToValueAtTime(180, now + 0.5);
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(1.4, now);
+      ng.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+      nSrc.connect(f);
+      f.connect(ng);
+      ng.connect(ctx.destination);
+      nSrc.start(now);
+    }
 
-      // 3. Multi-Resonant Ceramic Shards Ringing (Crystal/clay harmonics)
-      const resonantFrequencies = [1650, 2480, 3920, 5600, 7800];
-      resonantFrequencies.forEach((freq, idx) => {
+    function playCrystalShatterAudio() {
+      if (!audioEnabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      // High-pitched crystal bell ringings
+      const freqs = [4200, 5600, 7200, 9400, 11500];
+      freqs.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
-        osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
-        osc.frequency.setValueAtTime(freq + (Math.random() * 160 - 80), now);
-        
-        const decay = 0.15 + (idx * 0.05) + Math.random() * 0.2;
-        g.gain.setValueAtTime((0.28 / (idx + 1)) * safeInt, now);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq + Math.random() * 200, now);
+        const decay = 0.25 + idx * 0.08;
+        g.gain.setValueAtTime(0.35 / (idx + 1), now);
         g.gain.exponentialRampToValueAtTime(0.0001, now + decay);
-
         osc.connect(g);
         g.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + decay);
       });
-
-      // 4. Staggered Shard Clatters (Pieces ricocheting across floor)
-      const clatterCount = 5;
-      for (let i = 0; i < clatterCount; i++) {
-        const delay = 0.03 + i * 0.045 + Math.random() * 0.03;
-        setTimeout(() => {
-          if (!audioEnabled || !audioCtx) return;
-          const clinkOsc = ctx.createOscillator();
-          const clinkGain = ctx.createGain();
-          clinkOsc.frequency.setValueAtTime(3500 + Math.random() * 3000, ctx.currentTime);
-          clinkGain.gain.setValueAtTime(0.14 * safeInt, ctx.currentTime);
-          clinkGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
-          clinkOsc.connect(clinkGain);
-          clinkGain.connect(ctx.destination);
-          clinkOsc.start();
-          clinkOsc.stop(ctx.currentTime + 0.08);
-        }, delay * 1000);
-      }
     }
 
-    /**
-     * Synthesizes a high-velocity whoosh and air-shear throw sound
-     */
+    function playMagmaImpactAudio() {
+      if (!audioEnabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      // Extreme 25Hz subterranean quake
+      const sub = ctx.createOscillator();
+      const subG = ctx.createGain();
+      sub.type = 'sawtooth';
+      sub.frequency.setValueAtTime(65, now);
+      sub.frequency.exponentialRampToValueAtTime(20, now + 0.45);
+      subG.gain.setValueAtTime(1.5, now);
+      subG.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      sub.connect(subG);
+      subG.connect(ctx.destination);
+      sub.start(now);
+      sub.stop(now + 0.55);
+    }
+
+    function playBlockCrashAudio(force = 1.0) {
+      if (!audioEnabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const f = Math.min(Math.max(force, 0.4), 2.2);
+
+      // Heavy wooden/stone impact thud
+      const thudOsc = ctx.createOscillator();
+      const thudGain = ctx.createGain();
+      thudOsc.type = 'triangle';
+      thudOsc.frequency.setValueAtTime(140, now);
+      thudOsc.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+      thudGain.gain.setValueAtTime(0.75 * f, now);
+      thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      thudOsc.connect(thudGain);
+      thudGain.connect(ctx.destination);
+      thudOsc.start(now);
+      thudOsc.stop(now + 0.25);
+
+      // Wooden splinter / crack noise
+      const nLen = Math.floor(ctx.sampleRate * 0.2);
+      const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+      const nData = nBuf.getChannelData(0);
+      for (let i = 0; i < nLen; i++) {
+        nData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.03));
+      }
+      const nSrc = ctx.createBufferSource();
+      nSrc.buffer = nBuf;
+      const fFilter = ctx.createBiquadFilter();
+      fFilter.type = 'bandpass';
+      fFilter.frequency.setValueAtTime(950, now);
+      fFilter.Q.setValueAtTime(2.0, now);
+      const nGain = ctx.createGain();
+      nGain.gain.setValueAtTime(0.65 * f, now);
+      nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      nSrc.connect(fFilter);
+      fFilter.connect(nGain);
+      nGain.connect(ctx.destination);
+      nSrc.start(now);
+    }
+
     function playThrowWhooshAudio(power = 1.0) {
       if (!audioEnabled) return;
       const ctx = getAudioContext();
       if (!ctx) return;
       const now = ctx.currentTime;
 
-      const dur = 0.35;
+      const dur = 0.32;
       const bufLen = Math.floor(ctx.sampleRate * dur);
       const buffer = ctx.createBuffer(1, bufLen, ctx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -438,13 +589,13 @@
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(260, now);
-      filter.frequency.linearRampToValueAtTime(1400 * Math.max(power, 0.8), now + 0.15);
-      filter.frequency.exponentialRampToValueAtTime(180, now + dur);
+      filter.frequency.setValueAtTime(280, now);
+      filter.frequency.linearRampToValueAtTime(1550 * Math.max(power, 0.8), now + 0.12);
+      filter.frequency.exponentialRampToValueAtTime(200, now + dur);
 
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.01, now);
-      gain.gain.linearRampToValueAtTime(0.55 * Math.min(power, 2.0), now + 0.12);
+      gain.gain.linearRampToValueAtTime(0.6 * Math.min(power, 2.0), now + 0.1);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
 
       noise.connect(filter);
@@ -462,10 +613,8 @@
       return c;
     }
 
-    // Realistic weathered concrete & dark brick wall texture
     function generateWallTexture() {
       const canvas = createProceduralCanvas(1024, 1024, (ctx, w, h) => {
-        // Base dark industrial stone
         ctx.fillStyle = '#1e2126';
         ctx.fillRect(0, 0, w, h);
 
@@ -483,7 +632,6 @@
             ctx.fillStyle = `hsl(215, 10%, ${lum}%)`;
             ctx.fillRect(bx + 3, by + 3, cW - 6, rH - 6);
 
-            // Fine speckling
             for (let s = 0; s < 45; s++) {
               ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.18)';
               ctx.fillRect(bx + 4 + Math.random() * (cW - 8), by + 4 + Math.random() * (rH - 8), 2.5, 2.5);
@@ -491,7 +639,6 @@
           }
         }
 
-        // Mortar lines
         ctx.strokeStyle = '#0e1014';
         ctx.lineWidth = 4;
         for (let r = 0; r <= rows; r++) {
@@ -508,7 +655,6 @@
       return tex;
     }
 
-    // Concrete warehouse floor with reflective gloss
     function generateFloorTexture() {
       const canvas = createProceduralCanvas(512, 512, (ctx, w, h) => {
         ctx.fillStyle = '#14161a';
@@ -525,7 +671,6 @@
       return tex;
     }
 
-    // High fidelity porous terracotta texture
     function generateClayTexture() {
       const canvas = createProceduralCanvas(512, 512, (ctx, w, h) => {
         ctx.fillStyle = '#c05335';
@@ -543,7 +688,6 @@
       return new THREE.CanvasTexture(canvas);
     }
 
-    // Rich dark garden loam with organic grit
     function generateSoilTexture() {
       const canvas = createProceduralCanvas(256, 256, (ctx, w, h) => {
         ctx.fillStyle = '#1d120d';
@@ -556,6 +700,167 @@
         }
       });
       return new THREE.CanvasTexture(canvas);
+    }
+
+    function generateCrateTexture() {
+      const canvas = createProceduralCanvas(256, 256, (ctx, w, h) => {
+        ctx.fillStyle = '#9c6634';
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.strokeStyle = 'rgba(70, 40, 15, 0.45)';
+        ctx.lineWidth = 2;
+        for (let y = 32; y < h; y += 32) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = '#5a3517';
+        ctx.lineWidth = 14;
+        ctx.strokeRect(7, 7, w - 14, h - 14);
+
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.moveTo(12, 12);
+        ctx.lineTo(w - 12, h - 12);
+        ctx.moveTo(w - 12, 12);
+        ctx.lineTo(12, h - 12);
+        ctx.stroke();
+
+        ctx.fillStyle = '#2a1a0d';
+        const studs = [[16, 16], [w - 16, 16], [16, h - 16], [w - 16, h - 16]];
+        studs.forEach(([sx, sy]) => {
+          ctx.beginPath();
+          ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      });
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    // 🌋 溶岩テクスチャ生成
+    function generateMagmaTexture() {
+      const canvas = createProceduralCanvas(512, 512, (ctx, w, h) => {
+        ctx.fillStyle = '#181210';
+        ctx.fillRect(0, 0, w, h);
+
+        // Cracks of glowing lava
+        ctx.strokeStyle = '#ff4400';
+        ctx.lineWidth = 8;
+        ctx.shadowColor = '#ffaa00';
+        ctx.shadowBlur = 12;
+
+        for (let i = 0; i < 14; i++) {
+          ctx.beginPath();
+          let x = Math.random() * w;
+          let y = Math.random() * h;
+          ctx.moveTo(x, y);
+          for (let step = 0; step < 6; step++) {
+            x += (Math.random() - 0.5) * 80;
+            y += (Math.random() - 0.5) * 80;
+            ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+      });
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function spawnShockwave(pos, normal = new THREE.Vector3(0, 0, 1), color = 0xffa336, maxR = 7.0) {
+      const ringGeo = new THREE.RingGeometry(0.2, 0.55, 36);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: color,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.copy(pos).addScaledVector(normal, 0.05);
+
+      const defaultNormal = new THREE.Vector3(0, 0, 1);
+      if (Math.abs(normal.dot(defaultNormal)) < 0.999) {
+        const axis = new THREE.Vector3().crossVectors(defaultNormal, normal).normalize();
+        const angle = Math.acos(defaultNormal.dot(normal));
+        ring.quaternion.setFromAxisAngle(axis, angle);
+      } else if (normal.z < 0) {
+        ring.rotation.y = Math.PI;
+      }
+
+      scene.add(ring);
+      shockwaves.push({
+        mesh: ring,
+        radius: 0.3,
+        maxRadius: maxR,
+        expandSpeed: 19.0,
+        opacity: 0.95
+      });
+    }
+
+    function showCrashTextPopup(text = "💥 TOWER CRASH!!") {
+      const pop = document.createElement('div');
+      pop.className = 'crash-popup text-3xl md:text-5xl font-black bg-gradient-to-r from-amber-300 via-orange-400 to-rose-500 bg-clip-text text-transparent';
+      pop.innerText = text;
+      document.body.appendChild(pop);
+      setTimeout(() => pop.remove(), 850);
+    }
+
+    function buildPyramidTower() {
+      towerBlocks.forEach(b => scene.remove(b.mesh));
+      towerBlocks = [];
+
+      if (!crateTexture) {
+        crateTexture = generateCrateTexture();
+      }
+
+      const crateMat = new THREE.MeshStandardMaterial({
+        map: crateTexture,
+        roughness: 0.75,
+        metalness: 0.15
+      });
+
+      const bW = 0.95;
+      const bH = 0.65;
+      const bD = 0.95;
+      const crateGeo = new THREE.BoxGeometry(bW, bH, bD);
+
+      const baseZ = -9.8; // 奥の壁の直前に設置
+      const startY = ARENA.floorY + bH * 0.5;
+      const levels = 5; // 5段（15個のブロック）ピラミッド
+
+      for (let lvl = 0; lvl < levels; lvl++) {
+        const countInRow = levels - lvl;
+        const rowWidth = countInRow * bW;
+        const startX = -rowWidth / 2 + bW / 2;
+        const yPos = startY + lvl * bH;
+
+        for (let c = 0; c < countInRow; c++) {
+          const xPos = startX + c * bW;
+          const blockMesh = new THREE.Mesh(crateGeo, crateMat);
+          blockMesh.position.set(xPos, yPos, baseZ);
+          blockMesh.castShadow = true;
+          blockMesh.receiveShadow = true;
+          scene.add(blockMesh);
+
+          towerBlocks.push({
+            mesh: blockMesh,
+            size: new THREE.Vector3(bW, bH, bD),
+            radius: Math.hypot(bW, bH, bD) * 0.5,
+            initialPos: new THREE.Vector3(xPos, yPos, baseZ),
+            vel: new THREE.Vector3(0, 0, 0),
+            angVel: new THREE.Vector3(0, 0, 0),
+            isHit: false,
+            isResting: false
+          });
+        }
+      }
+    }
+
+    function resetTower() {
+      buildPyramidTower();
+      showToast('🗼 ピラミッドタワーを再構築しました！');
     }
 
     function initScene() {
@@ -576,42 +881,39 @@
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.2;
+      renderer.toneMappingExposure = 1.25;
       container.appendChild(renderer.domElement);
 
-      // Raycaster for aiming onto the 3D wall
       raycaster = new THREE.Raycaster();
       mouseNorm = new THREE.Vector2(0, 0);
 
       setupEnvironment();
       setupAimMarker();
       setupLighting();
-      spawnPot();
+      buildPyramidTower();
+      spawnReadyPot();
 
       window.addEventListener('resize', onResize);
       setupInputControllers();
     }
 
     function setupAimMarker() {
-      // Wall intersection virtual plane (infinite helper)
       wallAimPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -ARENA.wallZ);
 
-      // Dynamic aim reticle on the wall surface
       const markerCanvas = createProceduralCanvas(128, 128, (ctx, w, h) => {
         ctx.clearRect(0, 0, w, h);
-        ctx.strokeStyle = 'rgba(251, 146, 60, 0.9)';
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.95)';
         ctx.lineWidth = 6;
         ctx.beginPath();
         ctx.arc(w / 2, h / 2, 48, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.95)';
         ctx.beginPath();
         ctx.arc(w / 2, h / 2, 10, 0, Math.PI * 2);
         ctx.fill();
 
-        // Crosshairs
-        ctx.strokeStyle = 'rgba(251, 146, 60, 0.8)';
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.85)';
         ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(w / 2, 6); ctx.lineTo(w / 2, 28);
@@ -624,7 +926,7 @@
       const markerMat = new THREE.MeshBasicMaterial({
         map: new THREE.CanvasTexture(markerCanvas),
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.85,
         depthWrite: false
       });
       wallTargetMarker = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8), markerMat);
@@ -647,19 +949,19 @@
       // Target Crosshair / Bullseye on the wall
       const targetCanvas = createProceduralCanvas(256, 256, (ctx, w, h) => {
         ctx.clearRect(0, 0, w, h);
-        ctx.strokeStyle = 'rgba(255, 160, 40, 0.4)';
+        ctx.strokeStyle = 'rgba(255, 160, 40, 0.45)';
         ctx.lineWidth = 12;
         ctx.beginPath();
         ctx.arc(w/2, h/2, 95, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.strokeStyle = 'rgba(255, 60, 20, 0.55)';
+        ctx.strokeStyle = 'rgba(255, 60, 20, 0.6)';
         ctx.lineWidth = 8;
         ctx.beginPath();
         ctx.arc(w/2, h/2, 50, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.fillStyle = 'rgba(255, 220, 100, 0.7)';
+        ctx.fillStyle = 'rgba(255, 220, 100, 0.8)';
         ctx.beginPath();
         ctx.arc(w/2, h/2, 14, 0, Math.PI * 2);
         ctx.fill();
@@ -683,27 +985,25 @@
       floor.receiveShadow = true;
       scene.add(floor);
 
-      // 3. Heavy Iron / Wood Pedestal table where pot rests before launch
-      const pedestalGeo = new THREE.CylinderGeometry(0.9, 1.05, 1.4, 32);
+      // 3. Resting Table / Stand in front (カメラから離れた適切な位置に配置)
+      const pedestalGeo = new THREE.CylinderGeometry(0.75, 0.9, 1.3, 32);
       const pedestalMat = new THREE.MeshStandardMaterial({
-        color: 0x1b1c20,
-        roughness: 0.65,
+        color: 0x181a1f,
+        roughness: 0.6,
         metalness: 0.3
       });
       const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
-      pedestal.position.set(0, ARENA.floorY + 0.7, ARENA.pedestalZ);
+      pedestal.position.set(ARENA.readyPos.x, ARENA.floorY + 0.65, ARENA.readyPos.z);
       pedestal.castShadow = true;
       pedestal.receiveShadow = true;
       scene.add(pedestal);
     }
 
     function setupLighting() {
-      // Atmospheric Fill
-      const ambLight = new THREE.AmbientLight(0xd5e3f5, 0.4);
+      const ambLight = new THREE.AmbientLight(0xd5e3f5, 0.45);
       scene.add(ambLight);
 
-      // High impact Key Spotlight
-      const mainSpot = new THREE.SpotLight(0xfff1e0, 2.2);
+      const mainSpot = new THREE.SpotLight(0xfff1e0, 2.4);
       mainSpot.position.set(2.5, 7.5, 6);
       mainSpot.target.position.set(0, 0.8, -6);
       mainSpot.angle = Math.PI / 3.2;
@@ -715,14 +1015,12 @@
       scene.add(mainSpot);
       scene.add(mainSpot.target);
 
-      // Sharp Cold Rim Light for ceramic silhouettes
       const rimLight = new THREE.DirectionalLight(0x4080ff, 0.75);
       rimLight.position.set(-6, 4.5, -9);
       scene.add(rimLight);
 
-      // Warm pedestal light
-      const warmLight = new THREE.PointLight(0xff8833, 0.7, 12);
-      warmLight.position.set(0, 1.8, 2.5);
+      const warmLight = new THREE.PointLight(0xff8833, 0.8, 12);
+      warmLight.position.set(0.4, 1.2, 3.2);
       scene.add(warmLight);
     }
 
@@ -730,6 +1028,8 @@
       const group = new THREE.Group();
 
       let bodyMat;
+      let scaleMult = 1.0;
+
       if (type === 'glazed') {
         bodyMat = new THREE.MeshStandardMaterial({
           color: 0x1a727d,
@@ -749,8 +1049,34 @@
           roughness: 0.95,
           metalness: 0.05
         });
+      } else if (type === 'dynamite') {
+        // 💣 赤黒の危険ダイナマイトマテリアル
+        bodyMat = new THREE.MeshStandardMaterial({
+          color: 0xd91e18,
+          roughness: 0.35,
+          metalness: 0.2,
+          emissive: 0x550505
+        });
+      } else if (type === 'crystal') {
+        // 💎 半透明のクリスタルガラス
+        bodyMat = new THREE.MeshStandardMaterial({
+          color: 0x88e7ff,
+          roughness: 0.06,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.82
+        });
+      } else if (type === 'magma') {
+        // 🌋 脈動する巨大溶岩石
+        scaleMult = 1.55;
+        bodyMat = new THREE.MeshStandardMaterial({
+          map: generateMagmaTexture(),
+          roughness: 0.7,
+          metalness: 0.2,
+          emissive: 0xff3300,
+          emissiveIntensity: 0.55
+        });
       } else {
-        // Classic Terracotta
         bodyMat = new THREE.MeshStandardMaterial({
           map: generateClayTexture(),
           roughness: 0.85,
@@ -758,22 +1084,21 @@
         });
       }
 
-      // Lathe profile for realistic thickness and lip curl
       const pts = [];
-      const potH = 1.0;
-      const bR = 0.42;
-      const tR = 0.62;
-      const rimR = 0.68;
+      const potH = 1.0 * scaleMult;
+      const bR = 0.42 * scaleMult;
+      const tR = 0.62 * scaleMult;
+      const rimR = 0.68 * scaleMult;
 
       pts.push(new THREE.Vector2(bR * 0.8, 0.0));
       pts.push(new THREE.Vector2(bR, 0.05));
-      pts.push(new THREE.Vector2(bR * 1.05, 0.3));
+      pts.push(new THREE.Vector2(bR * 1.05, 0.3 * scaleMult));
       pts.push(new THREE.Vector2(tR * 0.96, potH * 0.86));
       pts.push(new THREE.Vector2(rimR, potH * 0.92));
       pts.push(new THREE.Vector2(rimR, potH));
       pts.push(new THREE.Vector2(rimR * 0.91, potH));
       pts.push(new THREE.Vector2(tR * 0.85, potH * 0.86));
-      pts.push(new THREE.Vector2(bR * 0.75, 0.12));
+      pts.push(new THREE.Vector2(bR * 0.75, 0.12 * scaleMult));
       pts.push(new THREE.Vector2(0.12, 0.1));
 
       const potGeo = new THREE.LatheGeometry(pts, 36);
@@ -783,44 +1108,65 @@
       bodyMesh.receiveShadow = true;
       group.add(bodyMesh);
 
-      // Soil Interior
+      // ダイナマイト鉢の場合は中央に導火線と火花を追加
+      if (type === 'dynamite') {
+        const fuseCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, potH * 0.9, 0),
+          new THREE.Vector3(0.05, potH * 1.15, 0.03),
+          new THREE.Vector3(-0.02, potH * 1.32, 0.08)
+        ]);
+        const fuseGeo = new THREE.TubeGeometry(fuseCurve, 10, 0.022, 6, false);
+        const fuseMesh = new THREE.Mesh(fuseGeo, new THREE.MeshBasicMaterial({ color: 0x332211 }));
+        group.add(fuseMesh);
+
+        const sparkGeo = new THREE.SphereGeometry(0.065, 8, 8);
+        const sparkMesh = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({ color: 0xffdd44 }));
+        sparkMesh.position.set(-0.02, potH * 1.32, 0.08);
+        group.add(sparkMesh);
+      }
+
       const soilMat = new THREE.MeshStandardMaterial({
         map: generateSoilTexture(),
         roughness: 0.96,
         metalness: 0.02
       });
-      const soilGeo = new THREE.CylinderGeometry(tR * 0.85, tR * 0.76, 0.22, 28);
+      const soilGeo = new THREE.CylinderGeometry(tR * 0.85, tR * 0.76, 0.22 * scaleMult, 28);
       const soilMesh = new THREE.Mesh(soilGeo, soilMat);
       soilMesh.position.y = potH * 0.82;
       soilMesh.castShadow = true;
       group.add(soilMesh);
 
-      // Lush Broadleaf Foliage (Monstera / Ficus)
       const plantGroup = new THREE.Group();
       plantGroup.position.y = potH * 0.86;
 
+      let leafColor = 0x2ea048;
+      if (type === 'glazed') leafColor = 0x227842;
+      else if (type === 'porcelain') leafColor = 0x1d6332;
+      else if (type === 'dynamite') leafColor = 0x772211;
+      else if (type === 'crystal') leafColor = 0x44ddee;
+      else if (type === 'magma') leafColor = 0xff6600;
+
       const leafMat = new THREE.MeshStandardMaterial({
-        color: type === 'glazed' ? 0x227842 : (type === 'porcelain' ? 0x1d6332 : 0x2ea048),
-        roughness: 0.35,
+        color: leafColor,
+        roughness: type === 'crystal' ? 0.1 : 0.35,
         metalness: 0.05,
         side: THREE.DoubleSide
       });
 
-      const leafCount = 10;
+      const leafCount = (type === 'dynamite') ? 5 : 10;
       for (let i = 0; i < leafCount; i++) {
         const ang = (i / leafCount) * Math.PI * 2 + Math.random() * 0.3;
         const stemCurve = new THREE.CatmullRomCurve3([
           new THREE.Vector3(Math.cos(ang) * 0.04, 0, Math.sin(ang) * 0.04),
-          new THREE.Vector3(Math.cos(ang) * 0.28, 0.38 + Math.random() * 0.2, Math.sin(ang) * 0.28),
-          new THREE.Vector3(Math.cos(ang) * 0.58, 0.54 + Math.random() * 0.25, Math.sin(ang) * 0.58)
+          new THREE.Vector3(Math.cos(ang) * 0.28, (0.38 + Math.random() * 0.2) * scaleMult, Math.sin(ang) * 0.28),
+          new THREE.Vector3(Math.cos(ang) * 0.58, (0.54 + Math.random() * 0.25) * scaleMult, Math.sin(ang) * 0.58)
         ]);
-        const stemGeo = new THREE.TubeGeometry(stemCurve, 10, 0.028, 6, false);
+        const stemGeo = new THREE.TubeGeometry(stemCurve, 10, 0.028 * scaleMult, 6, false);
         const stem = new THREE.Mesh(stemGeo, new THREE.MeshStandardMaterial({ color: 0x1b4d24, roughness: 0.6 }));
         stem.castShadow = true;
         plantGroup.add(stem);
 
-        // Broad Leaf blade
-        const leafGeo = new THREE.PlaneGeometry(0.42, 0.68, 5, 7);
+        const leafGeo = new THREE.PlaneGeometry(0.42 * scaleMult, 0.68 * scaleMult, 5, 7);
         const pos = leafGeo.attributes.position;
         for (let p = 0; p < pos.count; p++) {
           const py = pos.getY(p);
@@ -845,70 +1191,63 @@
         group: group,
         bodyMat: bodyMat,
         soilMat: soilMat,
-        leafMat: leafMat
+        leafMat: leafMat,
+        potType: type,
+        scaleMult: scaleMult
       };
     }
 
-    function spawnPot() {
-      if (autoRespawnTimeout) {
-        clearTimeout(autoRespawnTimeout);
-        autoRespawnTimeout = null;
-      }
-
-      if (currentPot && currentPot.mesh) {
-        scene.remove(currentPot.mesh);
+    function spawnReadyPot() {
+      // If there's already a held pot that hasn't been thrown, keep it
+      if (readyPot && readyPot.mesh) {
+        return readyPot;
       }
 
       const potData = buildPotModel(activePotType);
 
-      currentPot = {
+      readyPot = {
         mesh: potData.group,
         bodyMat: potData.bodyMat,
         soilMat: potData.soilMat,
         leafMat: potData.leafMat,
-        isThrown: false,
-        velocity: new THREE.Vector3(0, 0, 0),
-        angularVel: new THREE.Vector3(0, 0, 0),
-        launchSpeed: 0,
-        initialPos: new THREE.Vector3(0, ARENA.floorY + 1.4, ARENA.pedestalZ),
+        potType: potData.potType,
+        scaleMult: potData.scaleMult || 1.0,
+        initialPos: new THREE.Vector3().copy(ARENA.readyPos),
         spawnProgress: 0
       };
 
-      // Gentle scale-in spawn animation
-      currentPot.mesh.position.copy(currentPot.initialPos);
-      currentPot.mesh.rotation.set(0, Math.random() * Math.PI, 0);
-      currentPot.mesh.scale.set(0.01, 0.01, 0.01);
-      scene.add(currentPot.mesh);
+      readyPot.mesh.position.copy(readyPot.initialPos);
+      readyPot.mesh.rotation.set(0, Math.random() * Math.PI, 0);
+      // Start visibly small but quickly scale up
+      readyPot.mesh.scale.set(0.1, 0.1, 0.1);
+      scene.add(readyPot.mesh);
 
-      potReady = true;
-      hideSpeedLines();
+      updateReloadUI(true);
+      return readyPot;
+    }
 
-      // Update reload UI
+    function updateReloadUI(isReady) {
       const reloadIndicator = document.getElementById('reload-indicator');
       const reloadText = document.getElementById('reload-text');
       if (reloadIndicator && reloadText) {
-        reloadIndicator.className = 'w-3 h-3 rounded-full bg-emerald-400 shadow-md shadow-emerald-400/80 animate-pulse';
-        reloadText.innerText = 'READY (発射可能)';
-        reloadText.className = 'text-xs font-bold text-emerald-300';
+        if (isReady) {
+          reloadIndicator.className = 'w-3 h-3 rounded-full bg-emerald-400 shadow-md shadow-emerald-400/80 animate-pulse';
+          reloadText.innerText = 'READY (発射可能)';
+          reloadText.className = 'text-xs font-bold text-emerald-300';
+        } else {
+          reloadIndicator.className = 'w-3 h-3 rounded-full bg-amber-400 shadow-md shadow-amber-400/80 animate-ping';
+          reloadText.innerText = 'RELOADING...';
+          reloadText.className = 'text-xs font-bold text-amber-300';
+        }
       }
     }
 
-    /**
-     * Schedules the automatic replacement of the pot
-     */
-    function scheduleAutoRespawn(delayMs = 650) {
+    function scheduleAutoRespawn(delayMs = 280) {
       if (autoRespawnTimeout) clearTimeout(autoRespawnTimeout);
-
-      const reloadIndicator = document.getElementById('reload-indicator');
-      const reloadText = document.getElementById('reload-text');
-      if (reloadIndicator && reloadText) {
-        reloadIndicator.className = 'w-3 h-3 rounded-full bg-amber-400 shadow-md shadow-amber-400/80 animate-ping';
-        reloadText.innerText = 'RELOADING...';
-        reloadText.className = 'text-xs font-bold text-amber-300';
-      }
+      updateReloadUI(false);
 
       autoRespawnTimeout = setTimeout(() => {
-        spawnPot();
+        spawnReadyPot();
       }, delayMs);
     }
 
@@ -917,7 +1256,6 @@
       const canvas = createProceduralCanvas(512, 512, (ctx, w, h) => {
         ctx.clearRect(0, 0, w, h);
 
-        // Center black pulverization crater
         const grad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, 180);
         grad.addColorStop(0, 'rgba(10, 8, 7, 0.95)');
         grad.addColorStop(0.3, 'rgba(40, 22, 14, 0.85)');
@@ -928,7 +1266,6 @@
         ctx.arc(w/2, h/2, 180, 0, Math.PI * 2);
         ctx.fill();
 
-        // Jagged Radial Cracks & Fissures
         ctx.strokeStyle = 'rgba(8, 7, 6, 0.95)';
         ctx.lineWidth = 3.5;
         const numCracks = 10 + Math.floor(Math.random() * 6);
@@ -951,7 +1288,6 @@
           ctx.stroke();
         }
 
-        // Soil Splatter Droplets
         ctx.fillStyle = 'rgba(45, 28, 18, 0.88)';
         for (let s = 0; s < 60; s++) {
           const sx = w/2 + (Math.random() - 0.5) * 360;
@@ -974,65 +1310,113 @@
       scene.add(decalMesh);
       wallImpactDecals.push(decalMesh);
 
-      // Keep max 15 decals to preserve render efficiency
-      if (wallImpactDecals.length > 15) {
+      if (wallImpactDecals.length > 20) {
         const old = wallImpactDecals.shift();
         scene.remove(old);
       }
     }
 
-    /**
-     * Executes the catastrophic shatter physics:
-     * - Multi-tier ceramic shards (Base disc, Rim pieces, Body fragments, Small sharp chips)
-     * - Cohesive Root Ball & bursting soil particles
-     * - Detached fluttering foliage
-     * - Volumetric dust explosion
-     * - Shockwave visual flash & screen trauma
-     */
-    function shatterPot(impactPos, impactVel) {
-      if (!currentPot) return;
-
+    function shatterPot(flyingObj) {
+      const impactPos = flyingObj.mesh.position.clone();
+      const impactVel = flyingObj.velocity.clone();
       const hitSpeed = impactVel.length();
-      const speedKmH = Math.round(hitSpeed * 3.6 * 4.4); // Realistic ballistics conversion
-      const impactForceKn = ((0.5 * 3.8 * (hitSpeed * hitSpeed)) / 0.04 / 1000).toFixed(1); // Force = delta E / delta x
+      const pType = flyingObj.potType || 'terracotta';
+      const speedKmH = Math.round(hitSpeed * 3.6 * 4.4);
+      const impactForceKn = ((0.5 * 3.8 * (hitSpeed * hitSpeed)) / 0.04 / 1000).toFixed(1);
 
       analytics.smashes++;
       if (speedKmH > analytics.maxSpeed) analytics.maxSpeed = speedKmH;
       if (parseFloat(impactForceKn) > analytics.maxForce) analytics.maxForce = parseFloat(impactForceKn);
 
-      // Update UI Telemetry
       document.getElementById('stat-smashes').innerText = analytics.smashes;
       document.getElementById('stat-speed').innerHTML = `${analytics.maxSpeed} <span class="text-xs font-semibold text-cyan-200">km/h</span>`;
       document.getElementById('stat-force').innerHTML = `${analytics.maxForce} <span class="text-xs font-semibold text-rose-200">kN</span>`;
 
-      // Screen trauma & impact flash
-      cameraShake = Math.min(hitSpeed * 0.075, 0.85);
-      triggerFlashImpact();
+      // Remove the shattered pot mesh from scene
+      scene.remove(flyingObj.mesh);
+
+      if (pType === 'dynamite') {
+        // 💣 ダイナマイト鉢の超爆発処理
+        hitStopTimer = 0.08;
+        cameraShake = 1.45;
+        triggerFlashImpact();
+        playExplosionAudio();
+        spawnShockwave(impactPos, new THREE.Vector3(0, 0, 1), 0xff3300, 14.0);
+        showCrashTextPopup("💣 MEGA EXPLOSION!!");
+
+        // 爆風ブラスト：周囲半径6m以内のタワーブロックを猛烈に吹き飛ばす
+        towerBlocks.forEach(tb => {
+          const d = tb.mesh.position.distanceTo(impactPos);
+          if (d < 6.5) {
+            tb.isHit = true;
+            tb.isResting = false;
+            const blastDir = tb.mesh.position.clone().sub(impactPos).normalize();
+            const blastForce = (6.5 - d) * 7.5;
+            tb.vel.addScaledVector(blastDir, blastForce);
+            tb.vel.y += Math.random() * 4.0 + 3.0;
+            tb.angVel.set((Math.random() - 0.5) * 25, (Math.random() - 0.5) * 25, (Math.random() - 0.5) * 25);
+          }
+        });
+
+      } else if (pType === 'crystal') {
+        // 💎 クリスタルガラス鉢の破砕処理
+        hitStopTimer = 0.045;
+        cameraShake = 0.6;
+        triggerFlashImpact();
+        playCrystalShatterAudio();
+        spawnShockwave(impactPos, new THREE.Vector3(0, 0, 1), 0x77eeff, 8.5);
+        showCrashTextPopup("💎 CRYSTAL SHATTER!!");
+
+      } else if (pType === 'magma') {
+        // 🌋 メガ・マグマ鉢の巨大激震処理
+        hitStopTimer = 0.095;
+        cameraShake = 1.8;
+        triggerFlashImpact();
+        playMagmaImpactAudio();
+        spawnShockwave(impactPos, new THREE.Vector3(0, 0, 1), 0xff6600, 12.0);
+        showCrashTextPopup("🌋 VOLCANIC CRUSH!!");
+
+        // 巨体による広範囲粉砕
+        towerBlocks.forEach(tb => {
+          const d = tb.mesh.position.distanceTo(impactPos);
+          if (d < 4.2) {
+            tb.isHit = true;
+            tb.isResting = false;
+            tb.vel.add(new THREE.Vector3((Math.random() - 0.5) * 12, Math.random() * 6 + 3, Math.random() * 8 + 4));
+          }
+        });
+
+      } else {
+        // 通常ポットのヒットストップ・衝撃波
+        hitStopTimer = 0.055;
+        cameraShake = Math.min(hitSpeed * 0.09, 0.95);
+        triggerFlashImpact();
+        playAuthenticImpactAudio(hitSpeed / 10);
+        spawnShockwave(impactPos, new THREE.Vector3(0, 0, 1), 0xff9533, 7.5);
+      }
+
       hideSpeedLines();
 
-      // Audio
-      playAuthenticImpactAudio(hitSpeed / 10);
-
-      // Wall Impact Decal (if hit the wall)
       if (impactPos.z <= ARENA.wallZ + 0.7) {
         addWallImpactDecal(impactPos.x, impactPos.y);
       }
 
-      // Remove the intact pot
-      scene.remove(currentPot.mesh);
+      // 破片の生成（クリスタルの場合は140個の大量破片）
+      const shardMultiplier = (pType === 'crystal') ? 3.0 : (pType === 'magma' ? 1.4 : 1.0);
+      const baseCount = Math.floor(6 * shardMultiplier);
 
-      // 1. TIER 1: Heavy Base Disc & Rim Ring Chunks (Large mass)
-      for (let b = 0; b < 6; b++) {
+      // 1. TIER 1: Base Disc Chunks
+      for (let b = 0; b < baseCount; b++) {
         const baseSize = 0.28 + Math.random() * 0.18;
         const baseGeo = new THREE.CylinderGeometry(baseSize, baseSize * 1.1, 0.09, 5);
-        const baseMesh = new THREE.Mesh(baseGeo, currentPot.bodyMat);
+        const baseMesh = new THREE.Mesh(baseGeo, flyingObj.bodyMat);
         baseMesh.castShadow = true;
         baseMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, 0.1));
         baseMesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
 
         const reboundZ = Math.abs(impactVel.z) * (0.32 + Math.random() * 0.35);
         const burstAngle = Math.random() * Math.PI * 2;
-        const bForce = (Math.random() * 0.6 + 0.5) * hitSpeed * 0.4;
+        const bForce = (Math.random() * 0.6 + 0.5) * hitSpeed * (pType === 'dynamite' ? 0.9 : 0.4);
 
         shards.push({
           mesh: baseMesh,
@@ -1044,16 +1428,15 @@
         scene.add(baseMesh);
       }
 
-      // 2. TIER 2: Jagged Ceramic Body Shards (45 fragments)
-      const shardCount = 45;
+      // 2. TIER 2: Jagged Ceramic Body Shards (45 fragments or 135 for crystal)
+      const shardCount = Math.floor(45 * shardMultiplier);
       analytics.shards += shardCount;
       document.getElementById('stat-shards').innerText = analytics.shards;
 
       for (let i = 0; i < shardCount; i++) {
         const sSize = 0.12 + Math.random() * 0.2;
-        // Irregular faceted shard geometry
         const shardGeo = new THREE.ConeGeometry(sSize, sSize * 1.6, 3 + Math.floor(Math.random() * 3));
-        const shardMesh = new THREE.Mesh(shardGeo, currentPot.bodyMat);
+        const shardMesh = new THREE.Mesh(shardGeo, flyingObj.bodyMat);
         shardMesh.castShadow = true;
         shardMesh.receiveShadow = true;
 
@@ -1064,7 +1447,7 @@
         ));
 
         const burstAngle = Math.random() * Math.PI * 2;
-        const burstStr = (Math.random() * 0.7 + 0.4) * hitSpeed * 0.6;
+        const burstStr = (Math.random() * 0.7 + 0.4) * hitSpeed * (pType === 'dynamite' ? 1.2 : 0.6);
         const vel = new THREE.Vector3(
           Math.cos(burstAngle) * burstStr + impactVel.x * 0.3,
           Math.sin(burstAngle) * burstStr * 0.75 + Math.random() * 3.2,
@@ -1081,9 +1464,9 @@
         scene.add(shardMesh);
       }
 
-      // 3. TIER 3: Cohesive Root Ball (Heavy core of roots & soil)
+      // 3. TIER 3: Cohesive Root Ball
       const rootBallGeo = new THREE.DodecahedronGeometry(0.32, 1);
-      const rootBallMesh = new THREE.Mesh(rootBallGeo, currentPot.soilMat);
+      const rootBallMesh = new THREE.Mesh(rootBallGeo, flyingObj.soilMat);
       rootBallMesh.position.copy(impactPos).add(new THREE.Vector3(0, 0, 0.15));
       rootBallMesh.castShadow = true;
       rootBallDebris.push({
@@ -1094,11 +1477,11 @@
       });
       scene.add(rootBallMesh);
 
-      // 4. Loose Organic Soil Particles (85 soil specks)
-      const soilCount = 85;
+      // 4. Loose Organic Soil Particles
+      const soilCount = 80;
       for (let s = 0; s < soilCount; s++) {
         const soilGeo = new THREE.DodecahedronGeometry(0.045 + Math.random() * 0.065, 0);
-        const soilMesh = new THREE.Mesh(soilGeo, currentPot.soilMat);
+        const soilMesh = new THREE.Mesh(soilGeo, flyingObj.soilMat);
         soilMesh.castShadow = true;
         soilMesh.position.copy(impactPos).add(new THREE.Vector3(
           (Math.random() - 0.5) * 0.5,
@@ -1107,7 +1490,7 @@
         ));
 
         const ang = Math.random() * Math.PI * 2;
-        const force = (Math.random() * 0.7 + 0.3) * hitSpeed * 0.45;
+        const force = (Math.random() * 0.7 + 0.3) * hitSpeed * (pType === 'dynamite' ? 0.9 : 0.45);
         soilParticles.push({
           mesh: soilMesh,
           vel: new THREE.Vector3(Math.cos(ang) * force, Math.sin(ang) * force * 0.8 + Math.random() * 2.5, Math.abs(impactVel.z) * (0.2 + Math.random() * 0.3)),
@@ -1117,11 +1500,11 @@
         scene.add(soilMesh);
       }
 
-      // 5. Plant Foliage Detaching & Fluttering
-      const foliageCount = 10;
+      // 5. Plant Foliage Detaching
+      const foliageCount = 9;
       for (let f = 0; f < foliageCount; f++) {
         const leafGeo = new THREE.PlaneGeometry(0.32, 0.5);
-        const leafMesh = new THREE.Mesh(leafGeo, currentPot.leafMat);
+        const leafMesh = new THREE.Mesh(leafGeo, flyingObj.leafMat);
         leafMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, 0.1));
         leafMesh.castShadow = true;
 
@@ -1134,20 +1517,13 @@
         scene.add(leafMesh);
       }
 
-      // 6. Expanding Volumetric Dust Smoke
+      // 6. Volumetric Dust Smoke
       spawnDustExplosion(impactPos);
-
-      // Nullify current pot; allow immediate reset or auto-hint
-      currentPot = null;
-      potReady = false;
-
-      // Automatically queue the next pot with smooth delay!
-      scheduleAutoRespawn(650);
     }
 
     function spawnDustExplosion(pos) {
-      const dustCount = 22;
-      const dustGeo = new THREE.PlaneGeometry(1.0, 1.0);
+      const dustCount = 20;
+      const dustGeo = new THREE.PlaneGeometry(1.1, 1.1);
       const dustMat = new THREE.MeshBasicMaterial({
         color: activePotType === 'glazed' ? 0x82c8ce : (activePotType === 'porcelain' ? 0xe5eaf2 : 0xd29882),
         transparent: true,
@@ -1174,9 +1550,29 @@
       }
     }
 
+    function emitPotTrail(pos) {
+      // Small dust/air-vortex puffs trailing behind fast pot
+      const trailGeo = new THREE.SphereGeometry(0.12, 4, 4);
+      const trailMat = new THREE.MeshBasicMaterial({
+        color: 0xffa055,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false
+      });
+      const trailMesh = new THREE.Mesh(trailGeo, trailMat);
+      trailMesh.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2));
+      scene.add(trailMesh);
+
+      potTrails.push({
+        mesh: trailMesh,
+        opacity: 0.35,
+        scale: 1.0
+      });
+    }
+
     function triggerFlashImpact() {
       const flash = document.getElementById('flash-overlay');
-      flash.style.opacity = '0.5';
+      flash.style.opacity = '0.45';
       setTimeout(() => {
         flash.style.opacity = '0';
       }, 70);
@@ -1199,46 +1595,119 @@
     const FRICTION = 0.88;
 
     function stepPhysics(delta) {
-      const effDt = Math.min(delta, 0.05) * timeScale;
-
-      // 0. Spawning pop-in animation
-      if (currentPot && !currentPot.isThrown && currentPot.spawnProgress < 1.0) {
-        currentPot.spawnProgress = Math.min(1.0, currentPot.spawnProgress + effDt * 6.5);
-        // Spring ease
-        const t = currentPot.spawnProgress;
-        const scale = Math.sin(t * Math.PI * 0.5);
-        currentPot.mesh.scale.set(scale, scale, scale);
+      // 💥 HIT-STOP: 衝突瞬間に物理演算を瞬間停止させ、重い手応えを生む
+      if (hitStopTimer > 0) {
+        hitStopTimer -= delta;
+        updateCameraMotion(delta * 0.5);
+        return;
       }
 
-      // 1. In-Flight Thrown Pot
-      if (currentPot && currentPot.isThrown) {
-        currentPot.velocity.y += GRAVITY * effDt;
-        currentPot.mesh.position.addScaledVector(currentPot.velocity, effDt);
+      const effDt = Math.min(delta, 0.05) * timeScale;
 
-        currentPot.mesh.rotation.x += currentPot.angularVel.x * effDt;
-        currentPot.mesh.rotation.y += currentPot.angularVel.y * effDt;
-        currentPot.mesh.rotation.z += currentPot.angularVel.z * effDt;
+      // 0. Holding pot scaling animation
+      if (readyPot && readyPot.mesh) {
+        if (readyPot.spawnProgress < 1.0) {
+          readyPot.spawnProgress = Math.min(1.0, readyPot.spawnProgress + effDt * 7.0);
+          const t = readyPot.spawnProgress;
+          const s = Math.sin(t * Math.PI * 0.5);
+          readyPot.mesh.scale.set(s, s, s);
+        }
+      }
+
+      // 1. ALL Flying Pots in Air (Multi-projectile physics!)
+      for (let p = flyingPots.length - 1; p >= 0; p--) {
+        const fp = flyingPots[p];
+
+        if (fp.mesh.scale.x < 1.0) {
+          fp.mesh.scale.set(1.0, 1.0, 1.0);
+        }
+
+        fp.velocity.y += GRAVITY * effDt;
+        fp.mesh.position.addScaledVector(fp.velocity, effDt);
+
+        fp.mesh.rotation.x += fp.angularVel.x * effDt;
+        fp.mesh.rotation.y += fp.angularVel.y * effDt;
+        fp.mesh.rotation.z += fp.angularVel.z * effDt;
+
+        fp.trailTimer = (fp.trailTimer || 0) + effDt;
+        if (fp.trailTimer > 0.02) {
+          fp.trailTimer = 0;
+          emitPotTrail(fp.mesh.position);
+        }
+
+        // 🗼 COLLISION: Check impact with Pyramid Tower Blocks
+        let hitTower = false;
+        for (let tb of towerBlocks) {
+          const distToBlock = fp.mesh.position.distanceTo(tb.mesh.position);
+          if (distToBlock < tb.radius + 0.45) {
+            hitTower = true;
+            tb.isHit = true;
+            tb.isResting = false;
+
+            const potSpeed = fp.velocity.length();
+            const hitDir = fp.velocity.clone().normalize();
+            tb.vel.copy(hitDir).multiplyScalar(potSpeed * 0.75).add(new THREE.Vector3(0, 3.5, 0));
+            tb.angVel.set((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16);
+
+            // 連鎖衝撃：周囲のブロックも巻き込んでピラミッド全体が大崩落
+            for (let other of towerBlocks) {
+              if (other === tb) continue;
+              const d = tb.mesh.position.distanceTo(other.mesh.position);
+              if (d < 2.5) {
+                other.isHit = true;
+                other.isResting = false;
+                const pushOut = other.mesh.position.clone().sub(tb.mesh.position).normalize();
+                other.vel.addScaledVector(pushOut, (2.5 - d) * 4.5);
+                other.vel.y += Math.random() * 2.5 + 1.2;
+                other.angVel.add(new THREE.Vector3((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8));
+              }
+            }
+
+            playBlockCrashAudio(potSpeed / 12.0);
+            showCrashTextPopup("💥 TOWER CRASH!!");
+            shatterPot(fp);
+            flyingPots.splice(p, 1);
+            break;
+          }
+        }
+        if (hitTower) continue;
 
         // Front Target Wall Collision
-        if (currentPot.mesh.position.z <= ARENA.wallZ + 0.48) {
-          shatterPot(currentPot.mesh.position, currentPot.velocity);
-          return;
+        if (fp.mesh.position.z <= ARENA.wallZ + 0.5) {
+          shatterPot(fp);
+          flyingPots.splice(p, 1);
+          continue;
         }
 
         // Floor Collision
-        if (currentPot.mesh.position.y <= ARENA.floorY + 0.48) {
-          shatterPot(currentPot.mesh.position, currentPot.velocity);
-          return;
+        if (fp.mesh.position.y <= ARENA.floorY + 0.48) {
+          shatterPot(fp);
+          flyingPots.splice(p, 1);
+          continue;
         }
 
         // Side Walls Collision
-        if (Math.abs(currentPot.mesh.position.x) >= ARENA.sideX) {
-          shatterPot(currentPot.mesh.position, currentPot.velocity);
-          return;
+        if (Math.abs(fp.mesh.position.x) >= ARENA.sideX) {
+          shatterPot(fp);
+          flyingPots.splice(p, 1);
+          continue;
         }
       }
 
-      // 2. Ceramic Shards Physics
+      // 2. Flying Trails Fade
+      for (let tr = potTrails.length - 1; tr >= 0; tr--) {
+        const t = potTrails[tr];
+        t.opacity -= 1.8 * effDt;
+        t.scale += 2.0 * effDt;
+        t.mesh.scale.set(t.scale, t.scale, t.scale);
+        t.mesh.material.opacity = Math.max(0, t.opacity);
+        if (t.opacity <= 0) {
+          scene.remove(t.mesh);
+          potTrails.splice(tr, 1);
+        }
+      }
+
+      // 3. Ceramic Shards Physics
       for (let i = shards.length - 1; i >= 0; i--) {
         const s = shards[i];
         if (s.isResting) continue;
@@ -1250,7 +1719,6 @@
         s.mesh.rotation.y += s.angVel.y * effDt;
         s.mesh.rotation.z += s.angVel.z * effDt;
 
-        // Floor contact
         if (s.mesh.position.y <= ARENA.floorY + s.radius) {
           s.mesh.position.y = ARENA.floorY + s.radius;
           s.vel.y = -s.vel.y * FLOOR_RESTITUTION;
@@ -1263,14 +1731,13 @@
           }
         }
 
-        // Front Wall contact
         if (s.mesh.position.z <= ARENA.wallZ + s.radius) {
           s.mesh.position.z = ARENA.wallZ + s.radius;
           s.vel.z = Math.abs(s.vel.z) * WALL_RESTITUTION;
         }
       }
 
-      // 3. Soil Particles Physics
+      // 4. Soil Particles Physics
       for (let s of soilParticles) {
         if (s.isResting) continue;
         s.vel.y += (GRAVITY * 1.3) * effDt;
@@ -1285,7 +1752,7 @@
         }
       }
 
-      // 4. Root Ball Core
+      // 5. Root Ball Core
       for (let rb of rootBallDebris) {
         if (rb.isResting) continue;
         rb.vel.y += GRAVITY * effDt;
@@ -1298,7 +1765,7 @@
         }
       }
 
-      // 5. Foliage Aerodynamics
+      // 6. Foliage Aerodynamics
       for (let l of foliagePieces) {
         l.flutter += effDt * 9;
         l.vel.y += (GRAVITY * 0.28) * effDt;
@@ -1314,7 +1781,7 @@
         }
       }
 
-      // 6. Dust Cloud Fade
+      // 7. Dust Cloud Fade
       for (let d = dustClouds.length - 1; d >= 0; d--) {
         const dust = dustClouds[d];
         dust.mesh.position.addScaledVector(dust.vel, effDt);
@@ -1328,12 +1795,66 @@
         }
       }
 
-      // 7. Dynamic Camera Pitch, Trauma Shake & FOV Forward Dash
+      // 💥 8. Shockwave Ripple Expansion & Fade
+      for (let sw = shockwaves.length - 1; sw >= 0; sw--) {
+        const wave = shockwaves[sw];
+        wave.radius += wave.expandSpeed * effDt;
+        const scale = wave.radius;
+        wave.mesh.scale.set(scale, scale, 1);
+        wave.opacity -= 1.8 * effDt;
+        wave.mesh.material.opacity = Math.max(0, wave.opacity);
+
+        if (wave.opacity <= 0 || wave.radius >= wave.maxRadius) {
+          scene.remove(wave.mesh);
+          shockwaves.splice(sw, 1);
+        }
+      }
+
+      // 🗼 9. Tower Blocks Dynamic Physics (バウンド、転がり、散乱)
+      for (let tb of towerBlocks) {
+        if (!tb.isHit || tb.isResting) continue;
+
+        tb.vel.y += GRAVITY * effDt;
+        tb.mesh.position.addScaledVector(tb.vel, effDt);
+
+        tb.mesh.rotation.x += tb.angVel.x * effDt;
+        tb.mesh.rotation.y += tb.angVel.y * effDt;
+        tb.mesh.rotation.z += tb.angVel.z * effDt;
+
+        // Floor collision
+        const bottomY = ARENA.floorY + tb.size.y * 0.5;
+        if (tb.mesh.position.y <= bottomY) {
+          tb.mesh.position.y = bottomY;
+          tb.vel.y = -tb.vel.y * 0.32;
+          tb.vel.x *= 0.85;
+          tb.vel.z *= 0.85;
+          tb.angVel.multiplyScalar(0.78);
+
+          if (Math.abs(tb.vel.y) > 1.2) {
+            playBlockCrashAudio(0.5);
+          }
+
+          if (tb.vel.lengthSq() < 0.12) {
+            tb.isResting = true;
+          }
+        }
+
+        // Back Wall collision
+        if (tb.mesh.position.z <= ARENA.wallZ + tb.size.z * 0.5) {
+          tb.mesh.position.z = ARENA.wallZ + tb.size.z * 0.5;
+          tb.vel.z = Math.abs(tb.vel.z) * 0.4;
+        }
+
+        // Side Walls
+        if (Math.abs(tb.mesh.position.x) >= ARENA.sideX - 0.5) {
+          tb.vel.x = -tb.vel.x * 0.4;
+        }
+      }
+
       updateCameraMotion(effDt);
     }
 
     function updateCameraMotion(dt) {
-      // Camera Trauma Screen Shake
       if (cameraShake > 0.001) {
         cameraOffset.x = (Math.random() - 0.5) * cameraShake;
         cameraOffset.y = (Math.random() - 0.5) * cameraShake;
@@ -1342,7 +1863,6 @@
         cameraOffset.set(0, 0, 0);
       }
 
-      // FOV recovery after throw surge
       if (camera.fov > 50) {
         camera.fov += cameraFovVelocity * dt;
         cameraFovVelocity -= 65 * dt;
@@ -1354,6 +1874,32 @@
       camera.lookAt(cameraConfigs[cameraMode].target);
     }
 
+    function getWallIntersectPoint(clientX, clientY) {
+      mouseNorm.x = (clientX / window.innerWidth) * 2 - 1;
+      mouseNorm.y = -(clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouseNorm, camera);
+      const hitPoint = new THREE.Vector3();
+      const intersects = raycaster.ray.intersectPlane(wallAimPlane, hitPoint);
+
+      if (intersects) {
+        hitPoint.x = Math.max(-ARENA.sideX + 1.2, Math.min(ARENA.sideX - 1.2, hitPoint.x));
+        hitPoint.y = Math.max(ARENA.floorY + 0.6, Math.min(ARENA.ceilY - 0.5, hitPoint.y));
+        hitPoint.z = ARENA.wallZ;
+        return hitPoint;
+      }
+      return null;
+    }
+
+    function createTapRippleUI(clientX, clientY) {
+      const ripple = document.createElement('div');
+      ripple.className = 'tap-ripple';
+      ripple.style.left = `${clientX}px`;
+      ripple.style.top = `${clientY}px`;
+      document.body.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 450);
+    }
+
     function setupInputControllers() {
       const container = document.getElementById('canvas-container');
       const reticleHud = document.getElementById('reticle-hud');
@@ -1361,48 +1907,35 @@
       const aimLine = document.getElementById('aim-line');
       const aimTarget = document.getElementById('aim-target');
 
-      // Helper to raycast from screen coordinates to the front target wall (Z = ARENA.wallZ)
-      function updateWallAimFromScreen(clientX, clientY) {
-        mouseNorm.x = (clientX / window.innerWidth) * 2 - 1;
-        mouseNorm.y = -(clientY / window.innerHeight) * 2 + 1;
-
-        raycaster.setFromCamera(mouseNorm, camera);
-        const intersectPoint = new THREE.Vector3();
-        const hit = raycaster.ray.intersectPlane(wallAimPlane, intersectPoint);
-
-        if (hit) {
-          // Clamp within wall bounds
-          currentAimTarget.x = Math.max(-ARENA.sideX + 1.2, Math.min(ARENA.sideX - 1.2, intersectPoint.x));
-          currentAimTarget.y = Math.max(ARENA.floorY + 0.6, Math.min(ARENA.ceilY - 0.5, intersectPoint.y));
-          currentAimTarget.z = ARENA.wallZ;
-
-          // Move the 3D wall reticle
-          if (wallTargetMarker) {
-            wallTargetMarker.position.x = currentAimTarget.x;
-            wallTargetMarker.position.y = currentAimTarget.y;
-          }
-        }
-      }
-
       function onPointerStart(e) {
+        // 複数指や他のポインターによる同時押し・誤作動をブロック
+        if (isPointerDown && activePointerId !== null && activePointerId !== e.pointerId) return;
+
+        activePointerId = e.pointerId;
+        isPointerDown = true;
+
+        if (container.setPointerCapture) {
+          try { container.setPointerCapture(e.pointerId); } catch(err) {}
+        }
+
         const now = performance.now();
-        dragStart = { x: e.clientX, y: e.clientY, time: now };
+        pointerDownPos = { x: e.clientX, y: e.clientY, time: now };
         dragCurrent = { x: e.clientX, y: e.clientY, time: now };
         dragHistory = [{ x: e.clientX, y: e.clientY, time: now }];
 
-        // Update aim
-        updateWallAimFromScreen(e.clientX, e.clientY);
-
-        if (!potReady || !currentPot || currentPot.isThrown) {
-          // If pot isn't ready yet, respawn immediately on click so user can keep smashing
-          spawnPot();
+        // Update Wall Target Marker in 3D
+        const hit = getWallIntersectPoint(e.clientX, e.clientY);
+        if (hit) {
+          currentAimTarget.copy(hit);
+          if (wallTargetMarker) {
+            wallTargetMarker.position.x = hit.x;
+            wallTargetMarker.position.y = hit.y;
+          }
         }
 
-        isDragging = true;
-
         reticleHud.style.opacity = '1';
-        reticleHud.style.left = `${e.clientX - 48}px`;
-        reticleHud.style.top = `${e.clientY - 48}px`;
+        reticleHud.style.left = `${e.clientX - 40}px`;
+        reticleHud.style.top = `${e.clientY - 40}px`;
 
         aimTarget.setAttribute('cx', e.clientX);
         aimTarget.setAttribute('cy', e.clientY);
@@ -1411,7 +1944,6 @@
         aimLine.setAttribute('x2', e.clientX);
         aimLine.setAttribute('y2', e.clientY);
 
-        // Hide onboarding modal
         const guide = document.getElementById('guide-modal');
         if (guide) {
           guide.style.opacity = '0';
@@ -1420,50 +1952,82 @@
       }
 
       function onPointerMove(e) {
-        // Continuously update wall aim marker with mouse hover
-        updateWallAimFromScreen(e.clientX, e.clientY);
+        if (!isPointerDown || e.pointerId !== activePointerId) {
+          // ホバー時は3D壁面マーカーのみ追従
+          const hit = getWallIntersectPoint(e.clientX, e.clientY);
+          if (hit) {
+            currentAimTarget.copy(hit);
+            if (wallTargetMarker) {
+              wallTargetMarker.position.x = hit.x;
+              wallTargetMarker.position.y = hit.y;
+            }
+          }
+          return;
+        }
 
-        if (!isDragging) return;
+        const hit = getWallIntersectPoint(e.clientX, e.clientY);
+        if (hit) {
+          currentAimTarget.copy(hit);
+          if (wallTargetMarker) {
+            wallTargetMarker.position.x = hit.x;
+            wallTargetMarker.position.y = hit.y;
+          }
+        }
+
         const now = performance.now();
         dragCurrent = { x: e.clientX, y: e.clientY, time: now };
         dragHistory.push({ x: e.clientX, y: e.clientY, time: now });
         if (dragHistory.length > 8) dragHistory.shift();
 
-        const dx = dragCurrent.x - dragStart.x;
-        const dy = dragCurrent.y - dragStart.y;
+        const dx = dragCurrent.x - pointerDownPos.x;
+        const dy = dragCurrent.y - pointerDownPos.y;
         const dist = Math.hypot(dx, dy);
-        const powerRatio = Math.min(dist / 220, 1.0);
 
-        powerGauge.innerText = `POWER ${Math.round(powerRatio * 100)}%`;
-        reticleHud.style.left = `${e.clientX - 48}px`;
-        reticleHud.style.top = `${e.clientY - 48}px`;
+        if (dist > 15) {
+          powerGauge.innerText = `AIM: ${Math.round(Math.min(dist / 200, 1.0) * 100)}%`;
+          reticleHud.style.left = `${e.clientX - 40}px`;
+          reticleHud.style.top = `${e.clientY - 40}px`;
 
-        // Update 2D aiming line
-        aimLine.setAttribute('x2', e.clientX);
-        aimLine.setAttribute('y2', e.clientY);
+          aimLine.setAttribute('x2', e.clientX);
+          aimLine.setAttribute('y2', e.clientY);
 
-        // Dynamic Hand-Tumbling Response in 3D
-        if (currentPot && !currentPot.isThrown) {
-          currentPot.mesh.position.x = currentPot.initialPos.x + (dx / window.innerWidth) * 2.4;
-          currentPot.mesh.position.y = currentPot.initialPos.y - (dy / window.innerHeight) * 1.4;
-          currentPot.mesh.position.z = currentPot.initialPos.z + (dy > 0 ? (dy / 250) * 1.0 : 0);
-          currentPot.mesh.rotation.z = -dx * 0.004;
-          currentPot.mesh.rotation.x = -dy * 0.004;
+          // ドラッグに応じた手元鉢の微細な傾き演出
+          if (readyPot && readyPot.mesh) {
+            readyPot.mesh.position.x = readyPot.initialPos.x + (dx / window.innerWidth) * 1.5;
+            readyPot.mesh.position.y = readyPot.initialPos.y - (dy / window.innerHeight) * 1.0;
+            readyPot.mesh.rotation.z = -dx * 0.003;
+            readyPot.mesh.rotation.x = -dy * 0.003;
+          }
         }
       }
 
       function onPointerEnd(e) {
-        if (!isDragging) return;
-        isDragging = false;
+        if (!isPointerDown || (activePointerId !== null && e.pointerId !== activePointerId)) return;
+
+        isPointerDown = false;
+        const pointerId = activePointerId;
+        activePointerId = null;
+
+        if (container.releasePointerCapture && pointerId !== null) {
+          try { container.releasePointerCapture(pointerId); } catch(err) {}
+        }
+
         reticleHud.style.opacity = '0';
         aimLine.setAttribute('x1', '0');
         aimLine.setAttribute('y1', '0');
         aimLine.setAttribute('x2', '0');
         aimLine.setAttribute('y2', '0');
 
-        if (!currentPot || currentPot.isThrown) return;
+        const now = performance.now();
+        // 2重発火（ゴーストクリック・ダブルイベント）を完全に遮断するクールダウン判定
+        if (now - lastThrowTime < 130) {
+          return;
+        }
 
-        // Calculate flick velocity
+        const dx = dragCurrent.x - pointerDownPos.x;
+        const dy = dragCurrent.y - pointerDownPos.y;
+        const totalDist = Math.hypot(dx, dy);
+
         let flickVx = 0;
         let flickVy = 0;
         if (dragHistory.length >= 2) {
@@ -1474,63 +2038,52 @@
           flickVy = (newest.y - oldest.y) / dt;
         }
 
-        const dx = dragCurrent.x - dragStart.x;
-        const dy = dragCurrent.y - dragStart.y;
-        const totalDist = Math.hypot(dx, dy);
-
-        // Determine target destination point on the wall
         let targetPoint = currentAimTarget.clone();
+        let flightDuration = 0.54;
 
-        // If dragged significantly (slingshot pull or direction flick), extrapolate target
-        if (totalDist > 30) {
+        // CASE 1: DIRECT TAP ON WALL (壁直接タップ)
+        if (totalDist < 25) {
+          const directHit = getWallIntersectPoint(e.clientX, e.clientY);
+          if (directHit) {
+            targetPoint.copy(directHit);
+          }
+          createTapRippleUI(e.clientX, e.clientY);
+          flightDuration = 0.52;
+        } else {
+          // CASE 2: DRAGGED / SLINGSHOT / FLICK
           if (dy > 30) {
-            // Slingshot Pullback: pulling down and left launches up and right
             const pullFactorX = (-dx / window.innerWidth) * 16.0;
             const pullFactorY = (dy / window.innerHeight) * 8.0;
             targetPoint.x += pullFactorX;
             targetPoint.y += pullFactorY;
           } else {
-            // Forward flick: flick vector projects target offset
-            const flickOffsetX = (dx / window.innerWidth) * 18.0;
-            const flickOffsetY = (-dy / window.innerHeight) * 10.0;
+            const flickOffsetX = (dx / window.innerWidth) * 16.0;
+            const flickOffsetY = (-dy / window.innerHeight) * 9.0;
             targetPoint.x += flickOffsetX;
             targetPoint.y += flickOffsetY;
           }
+
+          const flickSpeed = Math.hypot(flickVx, flickVy);
+          if (flickSpeed > 600) {
+            flightDuration = Math.max(0.36, 0.52 - (flickSpeed / 5000) * 0.16);
+          } else if (totalDist > 120) {
+            flightDuration = 0.44;
+          }
         }
 
-        // Clamp target within arena walls
         targetPoint.x = Math.max(-ARENA.sideX + 1.0, Math.min(ARENA.sideX - 1.0, targetPoint.x));
         targetPoint.y = Math.max(ARENA.floorY + 0.4, Math.min(ARENA.ceilY - 0.4, targetPoint.y));
 
-        // Speed calculation based on flick or drag effort
-        let flightDuration = 0.42; // fast and punchy
-        const flickSpeed = Math.hypot(flickVx, flickVy);
-        if (flickSpeed > 500) {
-          // Super fast flick
-          flightDuration = Math.max(0.24, 0.42 - (flickSpeed / 5000) * 0.16);
-        } else if (totalDist > 120) {
-          // Strong pullback
-          flightDuration = 0.32;
-        }
-
-        throwPotTowards(targetPoint, flightDuration);
+        lastThrowTime = now;
+        launchPotToTarget(targetPoint, flightDuration);
       }
 
-      container.addEventListener('mousedown', onPointerStart);
-      window.addEventListener('mousemove', onPointerMove);
-      window.addEventListener('mouseup', onPointerEnd);
+      // PointerEventに一本化（touchstart/touchendとmousedown/mouseupの多重登録を全廃）
+      container.addEventListener('pointerdown', onPointerStart);
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerEnd);
+      window.addEventListener('pointercancel', onPointerEnd);
 
-      container.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 0) onPointerStart(e.touches[0]);
-      }, { passive: true });
-      window.addEventListener('touchmove', (e) => {
-        if (e.touches.length > 0) onPointerMove(e.touches[0]);
-      }, { passive: true });
-      window.addEventListener('touchend', (e) => {
-        onPointerEnd(e);
-      });
-
-      // Keyboard space shortcut
       window.addEventListener('keydown', (e) => {
         if (e.code === 'Space') {
           forceThrow(1.4);
@@ -1538,73 +2091,88 @@
       });
     }
 
-    /**
-     * Calculates ballistic trajectory to hit the exact 3D target coordinates
-     */
-    function throwPotTowards(targetPoint, duration = 0.38) {
-      if (!currentPot || currentPot.isThrown) return;
+    function launchPotToTarget(targetPoint, duration = 0.52) {
+      if (isShotgunMode) {
+        // 🎆 3連ショットガン：扇状に3個の鉢を一斉射出！
+        const spreads = [-2.4, 0, 2.4];
+        spreads.forEach((spreadX, idx) => {
+          setTimeout(() => {
+            const spreadTarget = targetPoint.clone();
+            spreadTarget.x += spreadX;
+            launchSinglePot(spreadTarget, duration * (0.95 + idx * 0.04));
+          }, idx * 35);
+        });
+      } else {
+        launchSinglePot(targetPoint, duration);
+      }
+    }
 
-      const p0 = currentPot.mesh.position;
-      const t = Math.max(0.2, duration);
+    function launchSinglePot(targetPoint, duration = 0.52) {
+      let potToThrow = readyPot;
+      if (!potToThrow || !potToThrow.mesh) {
+        potToThrow = spawnReadyPot();
+      }
 
-      // Solve ballistic equations with gravity:
-      // x(t) = x0 + vx * t  =>  vx = (xt - x0) / t
-      // z(t) = z0 + vz * t  =>  vz = (zt - z0) / t
-      // y(t) = y0 + vy * t + 0.5 * g * t^2  =>  vy = (yt - y0 - 0.5 * g * t^2) / t
+      potToThrow.mesh.scale.set(1.0, 1.0, 1.0);
+
+      const p0 = potToThrow.mesh.position.clone();
+      const t = Math.max(0.24, duration);
+
       const vx = (targetPoint.x - p0.x) / t;
-      const vz = (targetPoint.z - p0.z) / t; // This will be negative (forward)
+      const vz = (targetPoint.z - p0.z) / t;
       const vy = (targetPoint.y - p0.y - 0.5 * GRAVITY * t * t) / t;
 
-      executeThrow(vx, vy, -vz);
-    }
+      const flyingInstance = {
+        mesh: potToThrow.mesh,
+        bodyMat: potToThrow.bodyMat,
+        soilMat: potToThrow.soilMat,
+        leafMat: potToThrow.leafMat,
+        potType: potToThrow.potType || activePotType,
+        velocity: new THREE.Vector3(vx, vy, vz),
+        angularVel: new THREE.Vector3(
+          (Math.random() - 0.5) * 6 + 9,
+          (Math.random() - 0.5) * 10,
+          -vx * 0.35
+        ),
+        trailTimer: 0
+      };
 
-    /**
-     * Executes the forward pitch with dynamic body thrust and camera follow-through
-     */
-    function executeThrow(vx, vy, vz) {
-      if (!currentPot || currentPot.isThrown) return;
+      flyingPots.push(flyingInstance);
+      readyPot = null;
 
-      currentPot.isThrown = true;
-      currentPot.velocity.set(vx, vy, -vz);
-      currentPot.angularVel.set(
-        (Math.random() - 0.5) * 8 + 10,
-        (Math.random() - 0.5) * 12,
-        -vx * 0.4
-      );
-      currentPot.launchSpeed = currentPot.velocity.length();
-
-      // Camera follow-through thrust
       if (cameraMode === 0) {
-        camera.fov = 64;
-        cameraFovVelocity = 28;
+        camera.fov = 62;
+        cameraFovVelocity = 24;
         camera.updateProjectionMatrix();
-        baseCameraPos.copy(cameraConfigs[0].pos);
       }
 
-      // Visual speed lines
       showSpeedLines();
+      playThrowWhooshAudio(Math.abs(vz) / 18.0);
 
-      // Sound
-      playThrowWhooshAudio(vz / 18.0);
-
-      // Fail-safe auto-respawn timer in case pot leaves boundary or misses
-      scheduleAutoRespawn(1400);
+      scheduleAutoRespawn(260);
     }
 
-    function forceThrow(powerMultiplier = 1.5) {
-      if (!currentPot || currentPot.isThrown) {
-        spawnPot();
+    // 🎆 3連ショットガンモードのトグル
+    function toggleShotgunMode() {
+      isShotgunMode = !isShotgunMode;
+      const btn = document.getElementById('shotgun-toggle-btn');
+      const label = document.getElementById('shotgun-label');
+      if (isShotgunMode) {
+        btn.classList.add('shotgun-active');
+        label.innerText = '3連射: ON (ACTIVE)';
+        showToast('🎆 3連ショットガン射出モード ON！');
+      } else {
+        btn.classList.remove('shotgun-active');
+        label.innerText = '3連射: OFF';
+        showToast('単発投擲モードに戻りました');
       }
+    }
 
-      setTimeout(() => {
-        if (currentPot && !currentPot.isThrown) {
-          // Pick a random exciting target spot on the wall or use current reticle
-          const target = currentAimTarget.clone();
-          target.x += (Math.random() - 0.5) * 4.0;
-          target.y += (Math.random() - 0.5) * 3.0;
-          throwPotTowards(target, 0.32 / powerMultiplier);
-        }
-      }, 50);
+    function forceThrow(powerMultiplier = 1.4) {
+      const target = currentAimTarget.clone();
+      target.x += (Math.random() - 0.5) * 3.5;
+      target.y += (Math.random() - 0.5) * 2.5;
+      launchPotToTarget(target, 0.44 / powerMultiplier);
     }
 
     function cycleCameraView() {
@@ -1636,22 +2204,36 @@
         activeBtn.classList.remove('text-slate-300');
         activeBtn.classList.add('active', 'bg-gradient-to-r', 'from-orange-600', 'to-amber-600', 'text-white', 'shadow-md');
       }
-      respawnPot();
-      showToast('植木鉢の素材を変更しました');
+      respawnReadyPot();
+
+      const typeNames = {
+        terracotta: '素焼き鉢',
+        glazed: '瑠璃青磁鉢',
+        porcelain: '白磁花柄鉢',
+        concrete: '重モルタル鉢',
+        dynamite: '💣 特製ダイナマイト鉢 (大爆風ブラスト)',
+        crystal: '💎 クリスタルガラス鉢 (140破片 & パリン音)',
+        magma: '🌋 メガ・マグマ鉢 (超重量・地響き)'
+      };
+      showToast(`${typeNames[type] || type} を構えました！`);
     }
 
-    function respawnPot() {
-      spawnPot();
+    function respawnReadyPot() {
+      if (readyPot && readyPot.mesh) {
+        scene.remove(readyPot.mesh);
+        readyPot = null;
+      }
+      spawnReadyPot();
       showToast('新しい植木鉢を構えました！');
     }
 
     function toggleSlowMo() {
       isSlowMo = !isSlowMo;
-      timeScale = isSlowMo ? 0.16 : 1.0;
+      timeScale = isSlowMo ? 0.18 : 1.0;
       const btn = document.getElementById('slowmo-btn');
       const label = document.getElementById('slowmo-label');
       if (isSlowMo) {
-        label.innerText = 'スロー (0.16x)';
+        label.innerText = 'スロー (0.18x)';
         btn.classList.add('bg-cyan-500/25', 'border-cyan-400');
         showToast('スーパースローモーション ON');
       } else {
@@ -1666,14 +2248,20 @@
       rootBallDebris.forEach(rb => scene.remove(rb.mesh));
       foliagePieces.forEach(f => scene.remove(f.mesh));
       wallImpactDecals.forEach(d => scene.remove(d));
+      potTrails.forEach(tr => scene.remove(tr.mesh));
+      shockwaves.forEach(sw => scene.remove(sw.mesh));
       
       shards = [];
       soilParticles = [];
       rootBallDebris = [];
       foliagePieces = [];
       wallImpactDecals = [];
+      potTrails = [];
+      shockwaves = [];
 
-      showToast('破片と壁の傷を綺麗に清掃しました！');
+      buildPyramidTower();
+
+      showToast('破片と壁の傷を清掃し、タワーを再構築しました！');
     }
 
     function toggleAudio() {
@@ -1714,10 +2302,7 @@
       const dt = (now - lastTimestamp) / 1000;
       lastTimestamp = now;
 
-      // Physics step
       stepPhysics(dt);
-
-      // Render Three.js scene
       renderer.render(scene, camera);
     }
 
